@@ -2,4 +2,6 @@
 
 ## Datasets
 - ADL Piano MIDI Dataset: 
-  - Download: <r2.tomshen.io/cs230/adl-piano-midi.zip>
+  ```
+  r2.tomshen.io/cs230/adl-piano-midi.zip
+  ```
