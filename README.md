@@ -1,0 +1,5 @@
+# CS 230 Final Project: Everybody Compose: Deep Beats To Music 
+
+## Datasets
+- ADL Piano MIDI Dataset: 
+  - Download: <r2.tomshen.io/cs230/adl-piano-midi.zip>
