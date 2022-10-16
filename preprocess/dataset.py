@@ -74,16 +74,18 @@ def generate_sequences(beats_list: List[np.ndarray], notes_list: List[np.ndarray
             seq_length: An integer represent the beat sequence length of each training example.
         Returns:
             - A numpy array of shape (num_examples, seq_length, 2). Each row represents a sequence of beats.
-            - A numpy array of shape (num_examples, 1). Each row represents a note, which is the next expected note
-                that the network should predict given the beat sequence.
+            - A numpy array of shape (num_examples, seq_length, 128). Each row represents a sequence of note using one hot encoding,
+                which is the expected note sequence that the network should predict given the beat sequence.
+                128 represents the range of possible notes in the training data.
     """
     X_beats = []
     y_notes = []
     for beats, notes in zip(beats_list, notes_list):
         for i in range(0, len(notes) - seq_length):
             X_beats.append(beats[i:i + seq_length])
-            y_notes.append(notes[i + seq_length])
-    return np.array(X_beats), np.array(y_notes, dtype=np.int16)
+            note_sequence = notes[i:i + seq_length].reshape(-1,)
+            y_notes.append(np.eye(128)[note_sequence])
+    return np.array(X_beats), np.array(y_notes)
 
 if __name__ == "__main__":
     print("Sanity Check")
