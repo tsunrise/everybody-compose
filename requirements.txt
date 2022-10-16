@@ -5,3 +5,5 @@ scipy
 torch
 matplotlib
 music21
+toml
+tqdm

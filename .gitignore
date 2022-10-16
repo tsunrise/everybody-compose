@@ -1,3 +1,7 @@
+# CS230 Specific
+.cs230_cache/
+midi_data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
