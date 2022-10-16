@@ -1,9 +1,10 @@
 # Downloader for the midi files with cache
 import os
-from typing import List
+from typing import IO, Iterable, List
 import requests
 import toml
 from tqdm import tqdm
+import zipfile
 
 DATASETS_CONFIG_PATH = "datasets.toml"
 CACHE_DIR = ".cs230_cache"
@@ -33,6 +34,19 @@ def download_all() -> List[str]:
     """Download all the zip files and return a list of their paths."""
     config = toml.load(DATASETS_CONFIG_PATH)
     return [_download(f"{filename}.zip", url) for filename, url in config["datasets"].items()]
+
+def unzip_to_midi_files(archive_path: str) -> Iterable[IO[bytes]]:
+    """read all MIDI files in the archive recursively."""
+    # Use BFS to get all MIDI files in the archive
+    with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+        for info in zip_ref.infolist():
+            if info.filename.endswith(".mid"):
+                yield zip_ref.open(info)
+
+def midi_iterators() -> Iterable[IO[bytes]]:
+    """Get an iterator over all MIDI files bytestreams."""
+    for archive_path in download_all():
+        yield from unzip_to_midi_files(archive_path)
 
 if __name__ == "__main__":
     download_all()
