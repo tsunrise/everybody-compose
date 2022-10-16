@@ -30,7 +30,7 @@ def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tup
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Note):
-            notes.append(e.midi)
+            notes.append(e.pitch.midi)
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Rest):

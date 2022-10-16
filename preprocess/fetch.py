@@ -1,6 +1,6 @@
 # Downloader for the midi files with cache
 import os
-from typing import IO, Iterable, List
+from typing import IO, Generator, Iterable, List
 import requests
 import toml
 from tqdm import tqdm
@@ -42,7 +42,7 @@ def unzip_to_midi_files(archive_path: str) -> Iterable[IO[bytes]]:
             if info.filename.endswith(".mid"):
                 yield zip_ref.open(info)
 
-def midi_iterators() -> Iterable[IO[bytes]]:
+def midi_iterators() -> Generator[IO[bytes], None, None]:
     """Get an iterator over all MIDI files bytestreams."""
     for archive_path in download_all():
         yield from unzip_to_midi_files(archive_path)
