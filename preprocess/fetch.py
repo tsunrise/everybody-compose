@@ -8,7 +8,6 @@ import zipfile
 
 DATASETS_CONFIG_PATH = "datasets.toml"
 CACHE_DIR = ".cs230_cache"
-MIDI_DIR = "midi_data"
 
 def _download(filename: str, url: str) -> str:
     """Download a zip file from a URL if it's not already in the cache."""
