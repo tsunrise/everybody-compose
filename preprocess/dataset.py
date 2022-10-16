@@ -1,15 +1,15 @@
-from typing import IO, List, Tuple
+from typing import IO, List, Tuple, Union
 import music21
 import numpy as np
 import fetch
 
-def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tuple[List[int], List[float]]:
+def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tuple[List[Union[int, List[int]]], List[float]]:
     """Parse a MIDI file into a list of Note and Duration objects.
     Args:
         midi_file: A MIDI file bytestream.
         mono: Whether to convert the MIDI file to monophonic.
     Returns:
-        A tuple of (notes, durations) where notes is a list of integers
+        A tuple of (notes, durations) where notes is a list of (integers: if mono==True) or (lists of integers: if mono==False)
         representing the MIDI note numbers and durations is a list of floats
         representing the durations of each note in seconds.
     """
@@ -23,14 +23,13 @@ def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tup
         if isinstance(e, music21.chord.Chord):
             if mono:
                 # only use highest pitch
-                notes.append(str(max(e.pitches).midi))
+                notes.append(max(e.pitches).midi)
             else:
-                # concat ptiches via ,
-                notes.append(','.join([str(n.midi) for n in e.pitches]))
+                notes.append([n.midi for n in e.pitches])
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Note):
-            notes.append(str(e.midi))
+            notes.append(e.midi)
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Rest):
