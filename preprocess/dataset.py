@@ -1,9 +1,9 @@
-from typing import IO, List, Tuple, Union
+from typing import IO, List, Optional, Tuple, Union
 import music21
 import numpy as np
 import fetch
 
-def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tuple[List[Union[int, List[int]]], List[float]]:
+def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tuple[List[Optional[Union[int, List[int]]]], List[float]]:
     """Parse a MIDI file into a list of Note and Duration objects.
     Args:
         midi_file: A MIDI file bytestream.
@@ -30,7 +30,7 @@ def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tup
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Note):
-            notes.append(e.midi)
+            notes.append(e.pitch.midi)
             durations.append(e.duration.quarterLength)
 
         elif isinstance(e, music21.note.Rest):
