@@ -18,7 +18,7 @@ def train(args):
     print(f"Using {device} device")
 
     # initialize mdoel
-    model = DeepBeats(args.batch_size, args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     print(model)
 
     # define optimizer
@@ -26,8 +26,6 @@ def train(args):
 
     # prepare training data
     midi_iterator = fetch.midi_iterators()
-    midi_file = next(midi_iterator)
-    beats, notes = parse_midi_to_input_and_labels(midi_file)
     beats_list, notes_list = [], []
     midi_num = 0
     for midi_file in midi_iterator:
@@ -72,7 +70,6 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--n_epochs', type=int, default=10)
     parser.add_argument('--n_notes', type=int, default=128)
-    parser.add_argument('--n_durs', type=int, default=18)
     parser.add_argument('--seq_len', type=int, default=64)
     parser.add_argument('--mini_scale', default=False,
                         help='run mini scale training (10 midi files) for sanity check')

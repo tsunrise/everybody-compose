@@ -3,9 +3,8 @@ import torch.nn as nn
 
 
 class DeepBeats(nn.Module):
-    def __init__(self, batch_size, num_notes, embed_size, hidden_dim):
+    def __init__(self, num_notes, embed_size, hidden_dim):
         super(DeepBeats, self).__init__()
-        self.batch_size = batch_size
         self.durs_embed = nn.Linear(2, embed_size)
         self.layer1 = nn.LSTM(embed_size, hidden_dim, batch_first=True)
         self.layer2 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
