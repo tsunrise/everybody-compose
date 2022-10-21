@@ -1,4 +1,5 @@
 from pynput import keyboard
+import numpy as np
 import time
 
 def on_press(key):
@@ -35,7 +36,8 @@ def create_beat():
     '''
     Parse user's key presses into a sequence of beats.
     Record user's space key pressing time until the enter key is pressed
-    Return a list of (prev_rest_time, duration) representing beat sequence that user enters.
+    Return a numpy 2d array in shape of (seq_length, 2) representing beat sequence that user enters.
+    each row of the array is a beat represented by [prev_rest_time, duration]
     '''
     global prev_rest, duration, press_time, release_time, pressed
     prev_rest, duration = [], []
@@ -44,7 +46,7 @@ def create_beat():
 
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
-    beat_sequence = list(zip(prev_rest, duration))
+    beat_sequence = np.column_stack((prev_rest, duration))
     return beat_sequence
 
 
