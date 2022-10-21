@@ -7,3 +7,4 @@ matplotlib
 music21
 toml
 tqdm
+pynput
