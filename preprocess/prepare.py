@@ -184,6 +184,7 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
             try:
                 beats, notes = parse_midi_to_input_and_labels(midi_file)
             except Warning:
+                skipped += 1
                 bar.set_description(f"Parsing MIDI files (skipped {skipped})")
                 bar.update(1)
                 continue
