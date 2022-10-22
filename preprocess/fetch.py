@@ -19,7 +19,7 @@ def download(filename: str, url: str) -> str:
             chunk_size = 1024
             with open(cache_path, "wb") as f:
                 print(f"Downloading {filename} from {url}")
-                progress = tqdm(total = total_size_in_bytes, unit = 'iB', unit_scale = True)
+                progress = tqdm(total = total_size_in_bytes, unit = 'iB', unit_scale = True, colour="cyan")
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     progress.update(len(chunk))
                     f.write(chunk)

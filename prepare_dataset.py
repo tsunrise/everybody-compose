@@ -12,4 +12,7 @@ if __name__ == "__main__":
     seq_len = args.seq_len
     mono = args.mono
     max_files = None if args.max_files == -1 else args.max_files
-    prepare_dataset(args.seq_len, mono, max_files)
+    X, y = prepare_dataset(args.seq_len, mono, max_files)
+    print(f"X.shape={X.shape}")
+    print(f"y.shape={y.shape}")
+    

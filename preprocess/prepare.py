@@ -137,7 +137,7 @@ def _prepared_file_name(seq_length: int, mono: bool = True, max_files: Optional[
     """Get the name of the prepared file."""
     seq_length_str = f"seq{seq_length}"
     mono_str = "mono" if mono else "chord"
-    mx_file_str = f"max_files_{max_files}" if max_files is not None else "all_files"
+    mx_file_str = f"{max_files}_files" if max_files is not None else "all_files"
     return f"prepared_{seq_length_str}_{mono_str}_{mx_file_str}.npz"
 
 def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
@@ -163,7 +163,7 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     if not mono:
         raise NotImplementedError("Polyphonic music is not supported yet.")
 
-    file_name = _prepared_file_name(seq_length, mono)
+    file_name = _prepared_file_name(seq_length, mono, max_files)
     file_path = os.path.join(CACHE_DIR, file_name)
     if os.path.exists(file_path) and not override:
         print("Loading prepared dataset from disk...")
