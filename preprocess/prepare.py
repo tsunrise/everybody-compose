@@ -176,20 +176,30 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     midi_iterator, count = download_midi_files(max_files)
     beats_list, notes_list = [], []
     bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
-    skipped = 0
+    warnings_cnt = 0
+    errors_cnt = 0
 
     for midi_file in midi_iterator:
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
                 beats, notes = parse_midi_to_input_and_labels(midi_file)
+                beats_list.append(beats)
+                notes_list.append(notes)
             except Warning:
-                skipped += 1
-                bar.set_description(f"Parsing MIDI files (skipped {skipped})")
+                warnings_cnt += 1
+                bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
                 bar.update(1)
                 continue
-        beats_list.append(beats)
-        notes_list.append(notes)
+            except KeyboardInterrupt:
+                print(f"KeyboardInterrupt detected, exit")
+                # TODO: save progress
+                exit()
+            except Exception:
+                errors_cnt += 1
+                bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
+                bar.update(1)
+                continue
         bar.update(1)
     bar.close()
     X, labels = generate_sequences(beats_list, notes_list, seq_length=seq_length, one_hot=False)
