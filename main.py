@@ -3,12 +3,10 @@ import os
 
 import numpy as np
 import torch
+from preprocess.prepare import prepare_dataset
 
-import preprocess.fetch as fetch
 import utils.devices as devices
 from models.lstm import DeepBeats
-from preprocess.dataset import (generate_sequences,
-                                parse_midi_to_input_and_labels)
 
 
 def train(args):
@@ -25,17 +23,7 @@ def train(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # prepare training data
-    midi_iterator = fetch.midi_iterators()
-    beats_list, notes_list = [], []
-    midi_num = 0
-    for midi_file in midi_iterator:
-        if args.mini_scale and midi_num >= 10:
-            break
-        beats, notes = parse_midi_to_input_and_labels(midi_file)
-        beats_list.append(beats)
-        notes_list.append(notes)
-        midi_num += 1
-    X, y = generate_sequences(beats_list, notes_list, args.seq_len)
+    X, y = prepare_dataset(args.seq_len)
 
     # training loop
     for epoch in range(1, args.n_epochs + 1):
