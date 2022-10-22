@@ -5,6 +5,7 @@ import zipfile
 import music21
 import numpy as np
 import toml
+import warnings
 from preprocess.constants import CACHE_DIR, DATASETS_CONFIG_PATH
 
 from preprocess.fetch import download
@@ -174,12 +175,21 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
 
     midi_iterator, count = download_midi_files(max_files)
     beats_list, notes_list = [], []
-    bar = tqdm(total=count, desc="Parsing MIDI files", unit="files", colour="blue")
+    bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
+    skipped = 0
+
     for midi_file in midi_iterator:
-        beats, notes = parse_midi_to_input_and_labels(midi_file)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                beats, notes = parse_midi_to_input_and_labels(midi_file)
+            except Warning:
+                bar.set_description(f"Parsing MIDI files (skipped {skipped})")
+                bar.update(1)
+                continue
         beats_list.append(beats)
         notes_list.append(notes)
-        bar.update()
+        bar.update(1)
     bar.close()
     X, labels = generate_sequences(beats_list, notes_list, seq_length=seq_length, one_hot=False)
     np.savez_compressed(file_path, X=X, labels=labels)
