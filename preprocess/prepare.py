@@ -1,4 +1,5 @@
 import os
+import pickle
 from typing import IO, List, Optional, Tuple, Union
 import zipfile
 
@@ -145,7 +146,19 @@ def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
     """Convert a batch of labels to one hot encoding."""
     return np.eye(num_classes)[labels]
 
-def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=None, override: bool=False):
+def _save_progress(obj, file_name: str):
+    """Save the progress of the preparation."""
+    if os.path.exists(file_name):
+        os.remove(file_name)
+    with open(file_name, "wb") as f:
+        pickle.dump(obj, f)
+
+def _load_progress(file_name: str):
+    """Load the progress of the preparation."""
+    with open(file_name, "rb") as f:
+        return pickle.load(f)
+
+def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100):
     """
     Fetch MIDI files and prepare the dataset. If the dataset has already been prepared, it will be loaded from disk.
 
@@ -165,7 +178,9 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
         raise NotImplementedError("Polyphonic music is not supported yet.")
 
     file_name = _prepared_file_name(seq_length, mono, max_files)
+    progress_name = f"{file_name}.progress"
     file_path = os.path.join(CACHE_DIR, file_name)
+    progress_path = os.path.join(CACHE_DIR, progress_name)
     if os.path.exists(file_path) and not override:
         print("Loading prepared dataset from disk...")
         with np.load(file_path, allow_pickle=True) as data:
@@ -179,7 +194,18 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     warnings_cnt = 0
     errors_cnt = 0
 
+    skip = 0
+    if os.path.exists(progress_path):
+        progress = _load_progress(progress_path)
+        beats_list, notes_list = progress["beats_list"], progress["notes_list"]
+        skip = len(beats_list)
+        print("Resuming from previous progress...")
+
     for midi_file in midi_iterator:
+        if skip > 0:
+            skip -= 1
+            bar.update(1)
+            continue
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
@@ -201,8 +227,15 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
                 bar.update(1)
                 continue
         bar.update(1)
+        if len(beats_list) % progress_save_freq == 0:
+            _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
+
     bar.close()
     X, labels = generate_sequences(beats_list, notes_list, seq_length=seq_length, one_hot=False)
     np.savez_compressed(file_path, X=X, labels=labels)
     print(f"Saved prepared dataset to {file_path}")
+
+    if os.path.exists(progress_path):
+        os.remove(progress_path)
+
     return X, batch_one_hot(labels, 128)
