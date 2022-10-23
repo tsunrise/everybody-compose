@@ -128,12 +128,12 @@ def generate_sequences(beats_list: List[np.ndarray], notes_list: List[np.ndarray
             X_beats.append(beats[i:i + seq_length])
             note_sequence = notes[i:i + seq_length].reshape(-1,)
             if one_hot:
-                y_notes.append(np.eye(128)[note_sequence])
+                y_notes.append(np.eye(128, dtype=np.uint8)[note_sequence])
             else:
                 y_notes.append(note_sequence)
         bar.update(1)
     bar.close()
-    return np.array(X_beats), np.array(y_notes)
+    return np.array(X_beats), np.array(y_notes, dtype=np.uint8)
 
 def _prepared_file_name(seq_length: int, mono: bool = True, max_files: Optional[int] = None) -> str:
     """Get the name of the prepared file."""
@@ -184,16 +184,14 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     if os.path.exists(file_path) and not override:
         print("Loading prepared dataset from disk...")
         with np.load(file_path, allow_pickle=True) as data:
-            return data["X"], batch_one_hot(data["labels"], 128)
+            return data["X"], data["labels"]
     elif not os.path.exists(CACHE_DIR):
         os.mkdir(CACHE_DIR)
 
     midi_iterator, count = download_midi_files(max_files)
     beats_list, notes_list = [], []
-    bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
     warnings_cnt = 0
     errors_cnt = 0
-
     skip = 0
     if os.path.exists(progress_path):
         progress = _load_progress(progress_path)
@@ -201,6 +199,7 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
         skip = len(beats_list)
         print("Resuming from previous progress...")
 
+    bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
     for midi_file in midi_iterator:
         if skip > 0:
             skip -= 1
@@ -234,8 +233,5 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     X, labels = generate_sequences(beats_list, notes_list, seq_length=seq_length, one_hot=False)
     np.savez_compressed(file_path, X=X, labels=labels)
     print(f"Saved prepared dataset to {file_path}")
-
-    if os.path.exists(progress_path):
-        os.remove(progress_path)
 
     return X, labels
