@@ -4,6 +4,7 @@ import os
 import numpy as np
 import torch
 from preprocess.dataset import BeatsRhythmsDataset, collate_fn
+from utils.data_paths import DataPaths
 
 import utils.devices as devices
 import torch.utils.data
@@ -26,7 +27,7 @@ def train(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # prepare training data
-    max_files = 10 if args.mini_scale else None
+    max_files = None if args.n_files is None else int(args.n_files)
     dataset = BeatsRhythmsDataset(mono=True, max_files = max_files, seq_len=args.seq_len, save_freq=128)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
     # training loop
@@ -46,18 +47,18 @@ def train(args):
             num_batches += 1
         bar.update(1)
         bar.set_description("Loss: {:.4f}".format(batch_loss / num_batches))
-
+    bar.close()
     # save model
-    if not os.path.exists(args.model_dir):
-        os.makedirs(args.model_dir)
-    torch.save(model.state_dict(), f'./{args.model_dir}/{args.model_name}_{args.n_epochs}.pth') 
-    print(f'Model Saved at ./{args.model_dir}/{args.model_name}_{args.n_epochs}.pth')
+    paths = DataPaths()
+    model_file = "{}_{}_{}.pth".format(args.model_name, "all" if args.n_files is None else args.n_files, args.n_epochs)
+    model_path = paths.snapshots_dir / model_file
+    torch.save(model.state_dict(), model_path)
+    print(f'Model Saved at {model_path}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Train DeepBeats')
-    parser.add_argument('--model_name', type=str, default="vanilla_rnn")
-    parser.add_argument('--model_dir', type=str, default=".cs230_cache/snapshots")
+    parser.add_argument('--model_name', type=str, default="lstm")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)
@@ -65,8 +66,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_epochs', type=int, default=10)
     parser.add_argument('--n_notes', type=int, default=128)
     parser.add_argument('--seq_len', type=int, default=64)
-    parser.add_argument('--mini_scale', default=False,
-                        help='run mini scale training (10 midi files) for sanity check')
+    parser.add_argument('--n_files', default=None,
+                        help='number of midi files to use for training')
 
     main_args = parser.parse_args()
     train(main_args)

@@ -1,18 +1,15 @@
 # Downloader for the midi files with cache
 import os
+from pathlib import Path
 import requests
 from tqdm import tqdm
 
-from preprocess.constants import CACHE_DIR
+from utils.data_paths import DataPaths
 
-def download(filename: str, url: str) -> str:
+def download(filename: str, url: str) -> Path:
     """Download a zip file from a URL if it's not already in the cache."""
-    download_dir = os.path.join(CACHE_DIR, "downloads")
-    if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR)
-    if not os.path.exists(download_dir):
-        os.makedirs(download_dir)
-    cache_path = os.path.join(download_dir, filename)
+    paths = DataPaths()
+    cache_path = paths.downloads_dir / filename
     if not os.path.exists(cache_path):
         with requests.get(url, stream=True) as r:
             total_size_in_bytes = int(r.headers.get('content-length', 0))

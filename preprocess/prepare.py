@@ -7,11 +7,13 @@ import music21
 import numpy as np
 import toml
 import warnings
-from preprocess.constants import CACHE_DIR, DATASETS_CONFIG_PATH
+from preprocess.constants import DATASETS_CONFIG_PATH
 
 from preprocess.fetch import download
 
 from tqdm import tqdm
+
+from utils.data_paths import DataPaths
 
 def download_midi_files(max_files = None):
     """Get an iterator over all MIDI files bytestreams.
@@ -140,14 +142,12 @@ def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
     """Convert a batch of labels to one hot encoding."""
     return np.eye(num_classes)[labels]
 
-def _save_progress(obj, file_name: str):
+def _save_progress(obj, file_name: os.PathLike):
     """Save the progress of the preparation."""
-    if os.path.exists(file_name):
-        os.remove(file_name)
     with open(file_name, "wb") as f:
         pickle.dump(obj, f)
 
-def _load_progress(file_name: str):
+def _load_progress(file_name: os.PathLike):
     """Load the progress of the preparation."""
     with open(file_name, "rb") as f:
         return pickle.load(f)
@@ -158,14 +158,13 @@ def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, over
 
     file_name = _prepared_file_name(mono, max_files)
     progress_name = f"{file_name}.progress"
-    file_path = os.path.join(CACHE_DIR, file_name)
-    progress_path = os.path.join(CACHE_DIR, progress_name)
+    paths = DataPaths()
+    file_path = paths.prepared_data_dir / file_name
+    progress_path = paths.prepared_data_dir / progress_name
     if os.path.exists(file_path) and not override:
         print(f"Found prepared data at {file_path}.")
         progress = _load_progress(file_path)
         return progress["beats_list"], progress["notes_list"]
-    elif not os.path.exists(CACHE_DIR):
-        os.mkdir(CACHE_DIR)
 
     midi_iterator, count = download_midi_files(max_files)
     beats_list, notes_list = [], []
@@ -196,8 +195,8 @@ def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, over
                 bar.update(1)
                 continue
             except KeyboardInterrupt:
-                print(f"KeyboardInterrupt detected, exit")
-                # TODO: save progress
+                print(f"KeyboardInterrupt detected, saving progress and exit")
+                _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
                 exit()
             except Exception:
                 errors_cnt += 1
