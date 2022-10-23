@@ -170,7 +170,7 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
 
     Returns:
     - A numpy array of shape (num_examples, seq_length, 2). Each row represents a sequence of beats.
-    - A numpy array of shape (num_examples, seq_length, 128). Each row represents a sequence of note using one hot encoding,
+    - A numpy array of shape (num_examples, seq_length). Each row represents a sequence of note,
         which is the expected note sequence that the network should predict given the beat sequence.
         128 represents the range of possible notes in the training data.
     """
@@ -238,4 +238,4 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
     if os.path.exists(progress_path):
         os.remove(progress_path)
 
-    return X, batch_one_hot(labels, 128)
+    return X, labels

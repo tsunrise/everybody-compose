@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 import torch
-from preprocess.prepare import prepare_dataset
+from preprocess.prepare import batch_one_hot, prepare_dataset
 
 import utils.devices as devices
 from models.lstm import DeepBeats
@@ -24,6 +24,7 @@ def train(args):
 
     # prepare training data
     X, y = prepare_dataset(args.seq_len)
+    y = batch_one_hot(y, args.n_notes)
 
     # training loop
     for epoch in range(1, args.n_epochs + 1):
