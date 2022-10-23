@@ -3,10 +3,13 @@ import os
 
 import numpy as np
 import torch
-from preprocess.prepare import batch_one_hot, prepare_dataset
+from preprocess.dataset import BeatsRhythmsDataset, collate_fn
 
 import utils.devices as devices
+import torch.utils.data
 from models.lstm import DeepBeats
+
+import tqdm
 
 
 def train(args):
@@ -23,36 +26,38 @@ def train(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # prepare training data
-    X, y = prepare_dataset(args.seq_len)
-    y = batch_one_hot(y, args.n_notes)
-
+    max_files = 10 if args.mini_scale else None
+    dataset = BeatsRhythmsDataset(mono=True, max_files = max_files, seq_len=args.seq_len, save_freq=128)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
     # training loop
-    for epoch in range(1, args.n_epochs + 1):
-        num_batches = X.shape[0] // args.batch_size + 1
+    bar = tqdm.tqdm(total=args.n_epochs)
+    for _ in range(args.n_epochs):
         batch_loss = 0
-        for i in range(num_batches):
+        num_batches = 0
+        for X, y in dataloader:
             optimizer.zero_grad()
-            input_seq = torch.from_numpy(X[i: i + args.batch_size, :, :].astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(y[i: i + args.batch_size, :, :].astype(np.float32)).to(device)
+            input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
+            target_seq = torch.from_numpy(y.astype(np.float32)).to(device)
             output = model(input_seq)
             loss = model.loss_function(output, target_seq)
             batch_loss += loss.item()
             loss.backward()
             optimizer.step()
-        print('Epoch: {}/{}.............'.format(epoch, args.n_epochs), end=' ')
-        print("Loss: {:.4f} ".format(batch_loss / num_batches))
+            num_batches += 1
+        bar.update(1)
+        bar.set_description("Loss: {:.4f}".format(batch_loss / num_batches))
 
     # save model
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
-    torch.save(model.state_dict(), f'./{args.model_dir}/{args.model_name}_{epoch}.pth') 
-    print(f'Model Saved at ./{args.model_dir}/{args.model_name}_{epoch}.pth')
+    torch.save(model.state_dict(), f'./{args.model_dir}/{args.model_name}_{args.n_epochs}.pth') 
+    print(f'Model Saved at ./{args.model_dir}/{args.model_name}_{args.n_epochs}.pth')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Train DeepBeats')
     parser.add_argument('--model_name', type=str, default="vanilla_rnn")
-    parser.add_argument('--model_dir', type=str, default="snapshots")
+    parser.add_argument('--model_dir', type=str, default=".cs230_cache/snapshots")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)

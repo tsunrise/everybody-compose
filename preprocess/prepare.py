@@ -1,6 +1,6 @@
 import os
 import pickle
-from typing import IO, List, Optional, Tuple, Union
+from typing import IO, Generator, Iterable, List, Optional, Tuple, Union
 import zipfile
 
 import music21
@@ -107,33 +107,28 @@ def parse_midi_to_input_and_labels(midi_file: IO[bytes], mono: bool=True) -> Tup
     return beats, output_notes
 
 
-def generate_sequences(beats_list: List[np.ndarray], notes_list: List[np.ndarray], seq_length: int, one_hot: bool=True) -> Tuple[np.ndarray, np.ndarray]:
+def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int, one_hot: bool=True) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
     """
-        Convert a list of beats and a list of notes into a sequence of training data using sliding window.
+        Convert beats and notes into a sequence of training data using sliding window.
         Args:
-            beats_list: A list contains numpy arrays of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
-            notes_list: A list contains numpy arrays of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
-            seq_length: An integer represent the beat sequence length of each training example.
-        Returns:
-            - A numpy array of shape (num_examples, seq_length, 2). Each row represents a sequence of beats.
-            - A numpy array of shape (num_examples, seq_length, 128) if `one_hot` is True, or (num_examples, seq_length) if `one_hot` is False. Each row represents a sequence of note using one hot encoding,
+            - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
+            - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
+            - `seq_length`: An integer represent the beat sequence length of each training example.
+            - `one_hot`: Whether to convert the notes to one hot encoding.
+        Yields:
+            - numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
+            - numpy array of shape (seq_length, 128) if `one_hot` is True, or (seq_length, ) if `one_hot` is False. Each row represents a sequence of note using one hot encoding,
                 which is the expected note sequence that the network should predict given the beat sequence.
                 128 represents the range of possible notes in the training data.
     """
-    X_beats = []
-    y_notes = []
-    bar = tqdm(total=len(beats_list), desc="Generating sequences", colour="green")
-    for beats, notes in zip(beats_list, notes_list):
-        for i in range(0, len(notes) - seq_length):
-            X_beats.append(beats[i:i + seq_length])
-            note_sequence = notes[i:i + seq_length].reshape(-1,)
-            if one_hot:
-                y_notes.append(np.eye(128, dtype=np.uint8)[note_sequence])
-            else:
-                y_notes.append(note_sequence)
-        bar.update(1)
-    bar.close()
-    return np.array(X_beats), np.array(y_notes, dtype=np.uint8)
+    for i in range(0, len(notes) - seq_length):
+        X = beats[i:i + seq_length]
+        y = notes[i:i + seq_length].reshape(-1,)
+        
+        if one_hot:
+            yield X, np.eye(128)[y]
+        else:
+            yield X, y
 
 def _prepared_file_name(mono: bool = True, max_files: Optional[int] = None) -> str:
     """Get the name of the prepared file."""
@@ -157,7 +152,7 @@ def _load_progress(file_name: str):
     with open(file_name, "rb") as f:
         return pickle.load(f)
 
-def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100):
+def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     if not mono:
         raise NotImplementedError("Polyphonic music is not supported yet.")
 

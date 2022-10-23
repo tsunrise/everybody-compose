@@ -13,7 +13,7 @@ if __name__ == "__main__":
     seq_len = args.seq_len
     mono = args.mono
     max_files = None if args.max_files == -1 else args.max_files
-    beats, notes = prepare_raw_beats_notes(mono, max_files, progress_save_freq=args.save_freq)
+    beats, notes = prepare_raw_beats_notes(mono, max_files, progress_save_freq=args.save_freq, override=True)
     print(f"len(beats): {len(beats)}, len(notes): {len(notes)}")
     
     
