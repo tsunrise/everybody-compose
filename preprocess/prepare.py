@@ -135,12 +135,11 @@ def generate_sequences(beats_list: List[np.ndarray], notes_list: List[np.ndarray
     bar.close()
     return np.array(X_beats), np.array(y_notes, dtype=np.uint8)
 
-def _prepared_file_name(seq_length: int, mono: bool = True, max_files: Optional[int] = None) -> str:
+def _prepared_file_name(mono: bool = True, max_files: Optional[int] = None) -> str:
     """Get the name of the prepared file."""
-    seq_length_str = f"seq{seq_length}"
     mono_str = "mono" if mono else "chord"
     mx_file_str = f"{max_files}_files" if max_files is not None else "all_files"
-    return f"prepared_{seq_length_str}_{mono_str}_{mx_file_str}.npz"
+    return f"prepared_{mono_str}_{mx_file_str}.pkl"
 
 def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
     """Convert a batch of labels to one hot encoding."""
@@ -158,33 +157,18 @@ def _load_progress(file_name: str):
     with open(file_name, "rb") as f:
         return pickle.load(f)
 
-def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100):
-    """
-    Fetch MIDI files and prepare the dataset. If the dataset has already been prepared, it will be loaded from disk.
-
-    Args:
-    - `seq_length`: The sequence length of each training example.
-    - `mono`: Whether to convert the MIDI files to monophonic.
-    - `max_files`: The maximum number of MIDI files to use. If None, all MIDI files will be used.
-    - `override`: Whether to override the existing prepared dataset.
-
-    Returns:
-    - A numpy array of shape (num_examples, seq_length, 2). Each row represents a sequence of beats.
-    - A numpy array of shape (num_examples, seq_length). Each row represents a sequence of note,
-        which is the expected note sequence that the network should predict given the beat sequence.
-        128 represents the range of possible notes in the training data.
-    """
+def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100):
     if not mono:
         raise NotImplementedError("Polyphonic music is not supported yet.")
 
-    file_name = _prepared_file_name(seq_length, mono, max_files)
+    file_name = _prepared_file_name(mono, max_files)
     progress_name = f"{file_name}.progress"
     file_path = os.path.join(CACHE_DIR, file_name)
     progress_path = os.path.join(CACHE_DIR, progress_name)
     if os.path.exists(file_path) and not override:
-        print("Loading prepared dataset from disk...")
-        with np.load(file_path, allow_pickle=True) as data:
-            return data["X"], data["labels"]
+        print(f"Found prepared data at {file_path}.")
+        progress = _load_progress(file_path)
+        return progress["beats_list"], progress["notes_list"]
     elif not os.path.exists(CACHE_DIR):
         os.mkdir(CACHE_DIR)
 
@@ -230,8 +214,7 @@ def prepare_dataset(seq_length: int, mono: bool=True, max_files: Optional[int]=N
             _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
 
     bar.close()
-    X, labels = generate_sequences(beats_list, notes_list, seq_length=seq_length, one_hot=False)
-    np.savez_compressed(file_path, X=X, labels=labels)
-    print(f"Saved prepared dataset to {file_path}")
 
-    return X, labels
+    print(f"Saving prepared dataset to disk...")
+    _save_progress({"beats_list": beats_list, "notes_list": notes_list}, file_path)
+    return beats_list, notes_list

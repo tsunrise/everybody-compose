@@ -1,5 +1,5 @@
 import argparse
-from preprocess.prepare import prepare_dataset
+from preprocess.prepare import prepare_raw_beats_notes
 
 
 if __name__ == "__main__":
@@ -13,7 +13,7 @@ if __name__ == "__main__":
     seq_len = args.seq_len
     mono = args.mono
     max_files = None if args.max_files == -1 else args.max_files
-    X, y = prepare_dataset(args.seq_len, mono, max_files, progress_save_freq=args.save_freq)
-    print(f"X.shape={X.shape}")
-    print(f"y.shape={y.shape}")
+    beats, notes = prepare_raw_beats_notes(mono, max_files, progress_save_freq=args.save_freq)
+    print(f"len(beats): {len(beats)}, len(notes): {len(notes)}")
+    
     
