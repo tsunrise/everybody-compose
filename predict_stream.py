@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
-    parser.add_argument('--midi_filename', type=str, default="lstm_10.mid")
+    parser.add_argument('--midi_filename', type=str, default="output.mid")
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)
     parser.add_argument('--n_notes', type=int, default=128)
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     paths = DataPaths()
 
     # sample one midi file
-    dataset = preprocess.dataset.BeatsRhythmsDataset(max_files=1)
+    dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
     X, _ = next(iter(dataset))
 
     # load model

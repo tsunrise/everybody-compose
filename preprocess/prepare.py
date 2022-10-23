@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from utils.data_paths import DataPaths
 
-def download_midi_files(max_files = None):
+def download_midi_files(max_files = -1):
     """Get an iterator over all MIDI files bytestreams.
     
     Returns:
@@ -31,7 +31,7 @@ def download_midi_files(max_files = None):
             for info in zip_ref.infolist():
                 if info.filename.endswith(".mid"):
                     total += 1
-    if max_files is not None:
+    if max_files != -1:
         total = min(total, max_files)
     # iterate over midi files
     def _iter():
@@ -132,10 +132,10 @@ def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int, on
         else:
             yield X, y
 
-def _prepared_file_name(mono: bool = True, max_files: Optional[int] = None) -> str:
+def _prepared_file_name(mono: bool = True, max_files: int = -1) -> str:
     """Get the name of the prepared file."""
     mono_str = "mono" if mono else "chord"
-    mx_file_str = f"{max_files}_files" if max_files is not None else "all_files"
+    mx_file_str = f"{max_files}_files" if max_files != -1 else "all_files"
     return f"prepared_{mono_str}_{mx_file_str}.pkl"
 
 def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
@@ -152,7 +152,12 @@ def _load_progress(file_name: os.PathLike):
     with open(file_name, "rb") as f:
         return pickle.load(f)
 
-def prepare_raw_beats_notes(mono: bool=True, max_files: Optional[int]=None, override: bool=False, progress_save_freq: int=100) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+def load_prepared_dataset(file_name: os.PathLike):
+    """Load prepared dataset."""
+    progress =  _load_progress(file_name)
+    return progress["beats_list"], progress["notes_list"]
+
+def prepare_raw_beats_notes(mono: bool=True, max_files: int = -1, override: bool=False, progress_save_freq: int=100) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     if not mono:
         raise NotImplementedError("Polyphonic music is not supported yet.")
 
