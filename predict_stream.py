@@ -43,7 +43,6 @@ def predict_notes_sequence(durs_seq, model, device):
     curr_durs_seq = durs_seq.squeeze(0)[:, 1] # (seq_length,)
     return notes_seq, prev_rest_seq, curr_durs_seq
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
     parser.add_argument('--device', type=str, default="cpu")

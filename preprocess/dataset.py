@@ -32,6 +32,7 @@ class BeatsRhythmsDataset(IterableDataset):
 
     def __iter__(self):
         indices = np.arange(len(self.beats_list))
+        np.random.seed(0)
         np.random.shuffle(indices)
         indices = indices[:self.num_files]
 
