@@ -1,6 +1,5 @@
 # CS230 Specific
-.cs230_cache/
-midi_data/
+.project_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -165,3 +164,6 @@ cython_debug/
 
 # VSCode
 .vscode/
+
+# experiments
+test.ipynb

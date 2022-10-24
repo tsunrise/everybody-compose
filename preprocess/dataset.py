@@ -1,107 +1,58 @@
-from typing import IO, List, Optional, Tuple, Union
-import music21
+from torch.utils.data import IterableDataset
+from preprocess.constants import DATASETS_CONFIG_PATH
+from preprocess.prepare import generate_sequences, load_prepared_dataset, prepare_raw_beats_notes
+from preprocess.fetch import download
+
+import torch.utils.data
+import math
 import numpy as np
-import preprocess.fetch as fetch
+import toml
+import warnings
 
-def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True) -> Tuple[List[Optional[Union[int, List[int]]]], List[float]]:
-    """Parse a MIDI file into a list of Note and Duration objects.
-    Args:
-        midi_file: A MIDI file bytestream.
-        mono: Whether to convert the MIDI file to monophonic.
-    Returns:
-        A tuple of (notes, durations) where notes is a list of (integers: if mono==True) or (lists of integers: if mono==False)
-        representing the MIDI note numbers and durations is a list of floats
-        representing the durations of each note in seconds.
-        notes == None means there is a rest with no pitch attached to it.
-    """
-    parsed = music21.converter.parse(midi_file.read())
-    flattened = parsed.chordify().flat
-    
-    notes = []
-    durations = []
+class BeatsRhythmsDataset(IterableDataset):
+    def __init__(self, mono = True, num_files = -1, max_files_to_parse = -1, seq_len = 64, save_freq = 128):
+        need_process = max_files_to_parse != -1
+        if not need_process:
+            config = toml.load(DATASETS_CONFIG_PATH)
+            self.beats_list, self.notes_list = [], []
+            for name, value in config["datasets"].items():
+                fp = download(f"{name}.pkl", value["prepared"])
+                if fp is None:
+                    need_process = True
+                    warnings.warn(f"Failed to download {name}.pkl, will process raw data.")
+                    break
+                b, n = load_prepared_dataset(fp)
+                print(f"Downloaded {name}.pkl: {len(b)} files.")
+                self.beats_list.extend(b)
+                self.notes_list.extend(n)
+        if need_process:
+            self.beats_list, self.notes_list = prepare_raw_beats_notes(mono, max_files_to_parse, False, progress_save_freq=save_freq)
+        self.seq_len = seq_len
+        self.num_files = num_files if num_files != -1 else len(self.beats_list)
 
-    for e in flattened:
-        if isinstance(e, music21.chord.Chord):
-            if mono:
-                # only use highest pitch
-                notes.append(max(e.pitches).midi)
-            else:
-                notes.append([n.midi for n in e.pitches])
-            durations.append(e.duration.quarterLength)
+    def __iter__(self):
+        indices = np.arange(len(self.beats_list))
+        np.random.seed(0)
+        np.random.shuffle(indices)
+        indices = indices[:self.num_files]
 
-        elif isinstance(e, music21.note.Note):
-            notes.append(e.pitch.midi)
-            durations.append(e.duration.quarterLength)
-
-        elif isinstance(e, music21.note.Rest):
-            notes.append(None)
-            durations.append(e.duration.quarterLength)
-        
-    return notes, durations
-
-def parse_midi_to_input_and_labels(midi_file: IO[bytes], mono: bool=True) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Parse a MIDI file into a sequence of (prev_rest_time, duration).
-    Args:
-        midi_file: A MIDI file bytestream.
-        mono: Whether to convert the MIDI file to monophonic.
-    Returns:
-        - A numpy array of shape (num_notes, 2). Each row represents a beat. The first column
-          is the rest time since last beat, and the second column is the duration of the note.
-        - A numpy array of shape (num_notes, 1). Each row represents a beat. The column
-          is the MIDI note number.
-    """
-    notes, durations = _parse_midi_to_notes_durations(midi_file, mono)
-    beats, output_notes = [], []
-    prev_rest = 0
-    for i in range(len(notes)):
-        if notes[i] is None:
-            prev_rest += durations[i]
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is None:
+            for idx in indices:
+                # here: beats and notes represents beats and notes of one midi file
+                beats, notes = self.beats_list[idx], self.notes_list[idx]
+                yield from generate_sequences(beats, notes, self.seq_len, one_hot=True)
         else:
-            beats.append([prev_rest, durations[i]])
-            output_notes.append(notes[i])
-            prev_rest = 0
-    beats, output_notes = np.array(beats), np.array(output_notes).reshape(-1,1)
-    return beats, output_notes
+            lo, hi = 0, len(self.beats_list)
+            per_worker = int(math.ceil((hi - lo) / float(worker_info.num_workers)))
+            worker_id = worker_info.id
+            worker_lo, worker_hi = lo + worker_id * per_worker, min(lo + (worker_id + 1) * per_worker, hi)
+            for idx in indices[worker_lo:worker_hi]:
+                beats, notes = self.beats_list[idx], self.notes_list[idx]
+                yield from generate_sequences(beats, notes, self.seq_len, one_hot=True)
 
-
-def generate_sequences(beats_list: List[np.ndarray], notes_list: List[np.ndarray], seq_length: int) -> Tuple[np.ndarray, np.ndarray]:
-    """
-        Convert a list of beats and a list of notes into a sequence of training data using sliding window.
-        Args:
-            beats_list: A list contains numpy arrays of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
-            notes_list: A list contains numpy arrays of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
-            seq_length: An integer represent the beat sequence length of each training example.
-        Returns:
-            - A numpy array of shape (num_examples, seq_length, 2). Each row represents a sequence of beats.
-            - A numpy array of shape (num_examples, seq_length, 128). Each row represents a sequence of note using one hot encoding,
-                which is the expected note sequence that the network should predict given the beat sequence.
-                128 represents the range of possible notes in the training data.
-    """
-    X_beats = []
-    y_notes = []
-    for beats, notes in zip(beats_list, notes_list):
-        for i in range(0, len(notes) - seq_length):
-            X_beats.append(beats[i:i + seq_length])
-            note_sequence = notes[i:i + seq_length].reshape(-1,)
-            y_notes.append(np.eye(128)[note_sequence])
-    return np.array(X_beats), np.array(y_notes)
-
-if __name__ == "__main__":
-    print("Sanity Check")
-    midi_iterator = fetch.midi_iterators()
-    midi_file = next(midi_iterator)
-    beats, notes = parse_midi_to_input_and_labels(midi_file)
-    print(f"Beats ({beats.shape}):\n{beats[0:20]}")
-    print(f"Notes ({notes.shape}):\n{notes[0:20]}")
-    '''
-    beats_list, notes_list = [], []
-    for midi_file in midi_iterator:
-        beats, notes = parse_midi_to_input_and_labels(midi_file)
-        beats_list.append(beats)
-        notes_list.append(notes)
-    X, y = generate_sequences(beats_list, notes_list, seq_length = 64)
-    '''
-    
-    
-    
+def collate_fn(batch):
+    X, y = zip(*batch)
+    X = np.array(X)
+    y = np.array(y)
+    return X, y

@@ -1,3 +1,3 @@
 [datasets]
 # All files should be a zip archive of MIDI files (it's ok to have recursive directories)
-adl-piano-midi = "https://r2.tomshen.io/cs230/adl-piano-midi.zip"
+adl-piano-midi = {midi = "https://r2.tomshen.io/cs230/adl-piano-midi.zip", prepared = "https://r2.tomshen.io/cs230/prepared_mono_all_files.pkl"}

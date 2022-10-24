@@ -2,11 +2,10 @@ import argparse
 
 import music21
 import numpy as np
-import preprocess.fetch as fetch
+import preprocess.dataset
 import torch
 from models.lstm import DeepBeats
-from preprocess.dataset import (generate_sequences,
-                                parse_midi_to_input_and_labels)
+from utils.data_paths import DataPaths
 
 
 def write_to_midi(music, filename):
@@ -44,12 +43,11 @@ def predict_notes_sequence(durs_seq, model, device):
     curr_durs_seq = durs_seq.squeeze(0)[:, 1] # (seq_length,)
     return notes_seq, prev_rest_seq, curr_durs_seq
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
     parser.add_argument('--device', type=str, default="cpu")
-    parser.add_argument('--load_checkpoint', type=str, default="./snapshots/lstm_50.pth")
-    parser.add_argument('--midi_filename', type=str, default="./midi_outputs/lstm_50.mid")
+    parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
+    parser.add_argument('--midi_filename', type=str, default="output.mid")
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)
     parser.add_argument('--n_notes', type=int, default=128)
@@ -57,12 +55,11 @@ if __name__ == '__main__':
 
     main_args = parser.parse_args()
 
-    # sample midi file
-    midi_iterator = fetch.midi_iterators()
-    midi_file = next(midi_iterator)
-    beats, notes = parse_midi_to_input_and_labels(midi_file)
-    beats_list, notes_list = [beats], [notes]
-    X, y = generate_sequences(beats_list, notes_list, main_args.seq_len)
+    paths = DataPaths()
+
+    # sample one midi file
+    dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
+    X, _ = next(iter(dataset))
 
     # load model
     model = DeepBeats(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(main_args.device)
@@ -72,11 +69,12 @@ if __name__ == '__main__':
 
     # generate notes seq given durs seq
     notes, prev_rest, curr_durs = predict_notes_sequence(
-        durs_seq = X[0][np.newaxis, :].copy(), # select the first durs seq for now, batch size = 1
+        durs_seq = X[np.newaxis, :].copy(), # select the first durs seq for now, batch size = 1
         model=model,
         device=main_args.device
     )
 
     # convert stream to midi
     stream = convert_to_stream(notes, prev_rest, curr_durs)
-    write_to_midi(stream, main_args.midi_filename)
+    midi_paths = paths.midi_outputs_dir / main_args.midi_filename
+    write_to_midi(stream, midi_paths)
