@@ -3,7 +3,7 @@
 Log into AWS server:
 `ssh -i "~/.ssh/cs230_aws_key.pem" ubuntu@ec2-34-220-120-34.us-west-2.compute.amazonaws.com`
 
-Use tmux is recommended to avoid potential lost of progress due to disconnction. Start a new tmux session:
+Using tmux is recommended to avoid potential lost of progress due to disconnction. Start a new tmux session:
 `tmux new`
 
 Activate virtual environment:
