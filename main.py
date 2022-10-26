@@ -33,9 +33,9 @@ def train(args):
     print(model)
 
     if args.load_checkpoint:
-        checkpoint_path = paths.snapshots_dir / args.load_checkpoint
-        model.load_state_dict(torch.load(checkpoint_path))
-        print(f'Checkpoint loaded {checkpoint_path}')
+        filename = paths.snapshots_dir / args.load_checkpoint
+        model.load_state_dict(torch.load(filename))
+        print(f'Checkpoint loaded {filename}')
 
     # define optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
