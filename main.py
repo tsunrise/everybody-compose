@@ -1,9 +1,11 @@
 import argparse
 import os
+import datetime
 
 import numpy as np
 import torch
 import torch.utils.data
+from torch.utils.tensorboard import SummaryWriter
 
 import utils.devices as devices
 from models.lstm import DeepBeats
@@ -52,6 +54,11 @@ def train(args):
     val_dataset = BeatsRhythmsDataset(mono=True, num_files=args.n_files, seq_len=args.seq_len, save_freq=128, max_files_to_parse=args.max_files_to_parse, indices = val_indices)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
 
+    # define tensorboard writer
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    log_dir = paths.tensorboard_dir / "{}_{}/{}".format(args.model_name, "all" if args.n_files == -1 else args.n_files, current_time)
+    writer = SummaryWriter(log_dir = log_dir, flush_secs= 60)
+
     # training loop
     best_val_loss = np.inf
     for epoch in range(args.n_epochs):
@@ -87,6 +94,8 @@ def train(args):
         
         print('Epoch: {}/{}.............'.format(epoch, args.n_epochs), end=' ')
         print("Train Loss: {:.4f} Validation Loss: {:.4f}".format(avg_train_loss, avg_val_loss))
+        writer.add_scalar("train loss", avg_train_loss, epoch)
+        writer.add_scalar("validation loss", avg_val_loss, epoch)
 
         # save checkpoint with lowest validation loss
         if avg_val_loss < best_val_loss:
@@ -100,7 +109,7 @@ def train(args):
 
     # save model
     save_model(model, paths, args.model_name, args.n_files, args.n_epochs)
-
+    writer.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Train DeepBeats')
