@@ -8,3 +8,4 @@ music21
 toml
 tqdm
 pynput
+tensorboard
