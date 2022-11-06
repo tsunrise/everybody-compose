@@ -44,6 +44,8 @@ def create_beat():
     press_time, release_time = None, None
     pressed = False
 
+    print("use space key on keyboard to create a sequence of beat")
+    print("hit enter to stop")
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
     beat_sequence = np.column_stack((prev_rest, duration))
@@ -51,7 +53,7 @@ def create_beat():
 
 
 if __name__ == "__main__":
-    print("use space key on keyboard to create a sequence of beat")
-    print("hit enter to stop")
     beat_sequence = create_beat()
     print(beat_sequence)
+    # save the beat sequence to a file
+    np.save("beat_sequence.npy", beat_sequence)
