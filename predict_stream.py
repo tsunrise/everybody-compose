@@ -62,7 +62,7 @@ if __name__ == '__main__':
     # sample one midi file
     if main_args.source == 'interactive':
         X = create_beat()
-        X[0][0] = 5.
+        X[0][0] = 2.
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
         X, _ = next(iter(dataset))
