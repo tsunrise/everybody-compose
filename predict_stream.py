@@ -6,6 +6,7 @@ import preprocess.dataset
 import torch
 from models.lstm import DeepBeats
 from utils.data_paths import DataPaths
+from utils.beats_generator import create_beat
 
 
 def write_to_midi(music, filename):
@@ -52,14 +53,23 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dim', type=int, default=256)
     parser.add_argument('--n_notes', type=int, default=128)
     parser.add_argument('--seq_len', type=int, default=64)
+    parser.add_argument('--source', type=str, default="interactive")
 
     main_args = parser.parse_args()
 
     paths = DataPaths()
 
     # sample one midi file
-    dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
-    X, _ = next(iter(dataset))
+    if main_args.source == 'interactive':
+        X = create_beat()
+        X[0][0] = 2.
+    elif main_args.source == 'dataset':
+        dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
+        X, _ = next(iter(dataset))
+    else:
+        with open(main_args.source, 'rb') as f:
+            X = np.load(f, allow_pickle=True)
+
 
     # load model
     model = DeepBeats(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(main_args.device)
