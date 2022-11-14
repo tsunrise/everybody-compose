@@ -9,6 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 import utils.devices as devices
 from models.lstm import DeepBeats
+from models.vanilla_rnn import DeepBeats_VanillaRNN
+from models.bi_lstm import DeepBeats_BiLSTM
 from preprocess.constants import ADL_PIANO_TOTAL_SIZE
 from preprocess.dataset import BeatsRhythmsDataset, collate_fn
 from utils.data_paths import DataPaths
@@ -30,8 +32,15 @@ def train(args):
     paths = DataPaths()
     print(f"Using {device} device")
 
-    # initialize mdoel
-    model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    # initialize model
+    if args.model_name == "lstm":
+        model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif args.model_name == "vanilla_rnn":
+        model = DeepBeats_VanillaRNN(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif args.model_name == "bi_lstm":
+        model = DeepBeats_BiLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    else:
+        raise NotImplementedError(args.model_name + " not implemented.")
     print(model)
 
     if args.load_checkpoint:
