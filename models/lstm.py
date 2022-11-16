@@ -19,7 +19,7 @@ class DeepBeats(nn.Module):
         x = self.layer1(x)[0]
         x = self.layer2(x)[0]
         predicted_notes = self.notes_output(x)
-        return predicted_notes
+        return predicted_notes, None
 
     def sample(self, x):
         return self.forward(x, None)
@@ -33,3 +33,6 @@ class DeepBeats(nn.Module):
         target_one_hot = torch.nn.functional.one_hot(target, self.num_notes).float()
         loss = criterion(pred, target_one_hot)
         return loss
+        
+    def clip_gradients_(self, max_value):
+        torch.nn.utils.clip_grad.clip_grad_value_(self.parameters(), max_value)

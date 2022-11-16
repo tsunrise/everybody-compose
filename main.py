@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
-from models.lstm_tf import DeepBeatsTF
+from models.lstm_tf import DeepBeatsLSTM
 
 import utils.devices as devices
 from models.lstm import DeepBeats
@@ -35,7 +35,7 @@ def train(args):
     if args.model_name == "lstm":
         model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     elif args.model_name == "lstm_tf":
-        model = DeepBeatsTF(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+        model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     else:
         raise NotImplementedError("Model {} is not implemented.".format(args.model))
     print(model)
@@ -80,10 +80,11 @@ def train(args):
             input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
             target_seq = torch.from_numpy(y).long().to(device)
             target_prev_seq = torch.from_numpy(y_prev).long().to(device)
-            output = model(input_seq, target_prev_seq)
+            output, _ = model(input_seq, target_prev_seq)
             loss = model.loss_function(output, target_seq)
             train_batch_loss += loss.item()
             loss.backward()
+            model.clip_gradients_(5) # TODO: magic number
             optimizer.step()
             num_train_batches += 1
         

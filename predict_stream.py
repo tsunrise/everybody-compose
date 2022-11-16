@@ -2,6 +2,7 @@ import argparse
 
 import music21
 import numpy as np
+from models.lstm_tf import DeepBeatsLSTM
 import preprocess.dataset
 import torch
 from models.lstm import DeepBeats
@@ -30,23 +31,23 @@ def convert_to_stream(notes, prev_rest, curr_durs):
         s.append(a)
     return s
 
-def predict_notes_sequence(durs_seq, model, device):
+def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
     """
     Predict notes sequence given durations sequence
     """
     model.to(device)
     model.eval()
-    prob_n = model(torch.from_numpy(durs_seq.astype(np.float32)).to(device)) # (1, seq_length, 128)
-    prob_n = prob_n.cpu().detach().numpy()
-    notes_seq = np.argmax(prob_n, -1) # (1, seq_length)
-    notes_seq = notes_seq.squeeze(0) # (seq_length,)
-    prev_rest_seq = durs_seq.squeeze(0)[:, 0] # (seq_length,)
-    curr_durs_seq = durs_seq.squeeze(0)[:, 1] # (seq_length,)
+    dur_seq_t = torch.from_numpy(durs_seq).to(device)
+    init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
+
+    notes_seq = model.sample(dur_seq_t, init_note_t, temperature) # TODO: temperature is a magic number
+    prev_rest_seq = durs_seq[:, 0] # (seq_length,)
+    curr_durs_seq = durs_seq[:, 1] # (seq_length,)
+
     return notes_seq, prev_rest_seq, curr_durs_seq
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
-    parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
     parser.add_argument('--midi_filename', type=str, default="output.mid")
     parser.add_argument('--embed_dim', type=int, default=32)
@@ -54,8 +55,11 @@ if __name__ == '__main__':
     parser.add_argument('--n_notes', type=int, default=128)
     parser.add_argument('--seq_len', type=int, default=64)
     parser.add_argument('--source', type=str, default="interactive")
+    parser.add_argument('--init_note', type=int, default=60)
+    parser.add_argument('--temperature', type=float, default=0.5)
 
     main_args = parser.parse_args()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     paths = DataPaths()
 
@@ -63,25 +67,32 @@ if __name__ == '__main__':
     if main_args.source == 'interactive':
         X = create_beat()
         X[0][0] = 2.
+        # convert to float32
+        X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
         X, _ = next(iter(dataset))
     else:
         with open(main_args.source, 'rb') as f:
             X = np.load(f, allow_pickle=True)
+            X[0][0] = 2.
+            X = np.array(X, dtype=np.float32)
+
 
 
     # load model
-    model = DeepBeats(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(main_args.device)
+    model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
     if main_args.load_checkpoint:
         model.load_state_dict(torch.load(main_args.load_checkpoint))
     print(model)
 
     # generate notes seq given durs seq
     notes, prev_rest, curr_durs = predict_notes_sequence(
-        durs_seq = X[np.newaxis, :].copy(), # select the first durs seq for now, batch size = 1
+        durs_seq = X.copy(), # select the first durs seq for now, batch size = 1
         model=model,
-        device=main_args.device
+        init_note=main_args.init_note,
+        device=device,
+        temperature=main_args.temperature
     )
 
     # convert stream to midi
