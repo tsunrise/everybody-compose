@@ -71,12 +71,17 @@ if __name__ == '__main__':
         X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
-        X, _ = next(iter(dataset))
+        it = iter(dataset)
+        # skip first 10 files
+        for _ in range(24):
+            next(it)
+        X, _, _ = next(it)
+        X[0][0] = 2.
     else:
         with open(main_args.source, 'rb') as f:
             X = np.load(f, allow_pickle=True)
             X[0][0] = 2.
-            X = np.array(X, dtype=np.float32)
+    X = np.array(X, dtype=np.float32)
 
 
 

@@ -12,11 +12,15 @@ class DeepBeatsLSTM(nn.Module):
         super(DeepBeatsLSTM, self).__init__()
         self.note_embedding = nn.Embedding(num_notes, embed_size)
         self.concat_prev = ConcatPrev()
+        self.concat_input_fc = nn.Linear(embed_size + 2, embed_size + 2)
+        self.concat_input_activation = nn.LeakyReLU()
         self.layer1 = nn.LSTM(embed_size + 2, hidden_dim, batch_first=True)
         self.layer2 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
         self.notes_logits_output = nn.Linear(hidden_dim, num_notes)
         self.num_notes = num_notes
         self.hidden_dim = hidden_dim
+
+        self._initializer_weights()
 
     def _default_init_hidden(self, batch_size):
         device = next(self.parameters()).device
@@ -25,6 +29,13 @@ class DeepBeatsLSTM(nn.Module):
         h2_0 = torch.zeros(1, batch_size, self.layer2.hidden_size).to(device)
         c2_0 = torch.zeros(1, batch_size, self.layer2.hidden_size).to(device)
         return h1_0, c1_0, h2_0, c2_0
+
+    def _initializer_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0)
+
     def forward(self, x, y_prev, init_hidden=None):
         """
         x: input, shape: (batch_size, seq_len, 2)
@@ -34,11 +45,13 @@ class DeepBeatsLSTM(nn.Module):
         h1_0, c1_0, h2_0, c2_0 = self._default_init_hidden(x.shape[0]) if init_hidden is None else init_hidden
         # Embedding
         y_prev_embed = self.note_embedding(y_prev)
-        # concat x and y_prev_embed to be X
-        # print(f"x.shape: {x.shape}")
-        # print(f"y_prev_embed.shape: {y_prev_embed.shape}")
-        # print(f"h1_0.shape: {h1_0.shape}")
         X = self.concat_prev(x, y_prev_embed)
+        # Concat input
+        X_fc = self.concat_input_fc(X)
+        X_fc = self.concat_input_activation(X)
+        # residual connection
+        X_fc = X_fc + X
+
         X, (h1, c1) = self.layer1(X, (h1_0, c1_0))
         X, (h2, c2) = self.layer2(X, (h2_0, c2_0))
         predicted_notes = self.notes_logits_output(X)
