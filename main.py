@@ -5,7 +5,8 @@ import datetime
 import numpy as np
 import torch
 import torch.utils.data
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
+from models.lstm_tf import DeepBeatsLSTM
 
 import utils.devices as devices
 from models.lstm import DeepBeats
@@ -31,7 +32,12 @@ def train(args):
     print(f"Using {device} device")
 
     # initialize mdoel
-    model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    if args.model_name == "lstm":
+        model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif args.model_name == "lstm_tf":
+        model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    else:
+        raise NotImplementedError("Model {} is not implemented.".format(args.model))
     print(model)
 
     if args.load_checkpoint:
@@ -46,13 +52,14 @@ def train(args):
     indices = np.arange(args.n_files if args.n_files != -1 else ADL_PIANO_TOTAL_SIZE)
     np.random.seed(0)
     np.random.shuffle(indices)
-    train_size = int(0.8 * len(indices))
+    # train_size = int(0.8 * len(indices))
+    train_size = len(indices)
     train_indices = indices[: train_size]
     val_indices = indices[train_size: ]
     train_dataset = BeatsRhythmsDataset(mono=True, num_files=args.n_files, seq_len=args.seq_len, save_freq=128, max_files_to_parse=args.max_files_to_parse, indices = train_indices)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
-    val_dataset = BeatsRhythmsDataset(mono=True, num_files=args.n_files, seq_len=args.seq_len, save_freq=128, max_files_to_parse=args.max_files_to_parse, indices = val_indices)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
+    # val_dataset = BeatsRhythmsDataset(mono=True, num_files=args.n_files, seq_len=args.seq_len, save_freq=128, max_files_to_parse=args.max_files_to_parse, indices = val_indices)
+    # val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=0, collate_fn=collate_fn)
 
     # define tensorboard writer
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
@@ -60,48 +67,50 @@ def train(args):
     writer = SummaryWriter(log_dir = log_dir, flush_secs= 60)
 
     # training loop
-    best_val_loss = np.inf
+    # best_val_loss = np.inf
     for epoch in range(args.n_epochs):
         train_batch_loss = 0
-        val_batch_loss = 0
+        # val_batch_loss = 0
         num_train_batches = 0
-        num_val_batches = 0
+        # num_val_batches = 0
 
         model.train()
-        for X, y in train_loader:
+        for X, y, y_prev in train_loader:
             optimizer.zero_grad()
             input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(y.astype(np.float32)).to(device)
-            output = model(input_seq)
+            target_seq = torch.from_numpy(y).long().to(device)
+            target_prev_seq = torch.from_numpy(y_prev).long().to(device)
+            output, _ = model(input_seq, target_prev_seq)
             loss = model.loss_function(output, target_seq)
             train_batch_loss += loss.item()
             loss.backward()
+            model.clip_gradients_(5) # TODO: magic number
             optimizer.step()
             num_train_batches += 1
         
-        model.eval()
-        for X, y in val_loader:
-            input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(y.astype(np.float32)).to(device)
-            with torch.no_grad():
-                output = model(input_seq)
-            loss = model.loss_function(output, target_seq)
-            val_batch_loss += loss.item()
-            num_val_batches += 1
+        # model.eval()
+        # for X, y in val_loader:
+        #     input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
+        #     target_seq = torch.from_numpy(y.astype(np.float32)).to(device)
+        #     with torch.no_grad():
+        #         output = model(input_seq)
+        #     loss = model.loss_function(output, target_seq)
+        #     val_batch_loss += loss.item()
+        #     num_val_batches += 1
 
         avg_train_loss = train_batch_loss / num_train_batches
-        avg_val_loss = val_batch_loss / num_val_batches
+        # avg_val_loss = val_batch_loss / num_val_batches
         
         print('Epoch: {}/{}.............'.format(epoch, args.n_epochs), end=' ')
-        print("Train Loss: {:.4f} Validation Loss: {:.4f}".format(avg_train_loss, avg_val_loss))
+        print("Train Loss: {:.4f}".format(avg_train_loss))
         writer.add_scalar("train loss", avg_train_loss, epoch)
-        writer.add_scalar("validation loss", avg_val_loss, epoch)
+        # writer.add_scalar("validation loss", avg_val_loss, epoch)
 
         # save checkpoint with lowest validation loss
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            save_model(model, paths, args.model_name, args.n_files, "best")
-            print("Minimum Validation Loss of {:.4f} at epoch {}/{}".format(best_val_loss, epoch, args.n_epochs))
+        # if avg_val_loss < best_val_loss:
+        #     best_val_loss = avg_val_loss
+        #     save_model(model, paths, args.model_name, args.n_files, "best")
+        #     print("Minimum Validation Loss of {:.4f} at epoch {}/{}".format(best_val_loss, epoch, args.n_epochs))
             
         # save snapshots
         if (epoch + 1) % args.snapshots_freq == 0:
@@ -113,7 +122,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Train DeepBeats')
-    parser.add_argument('--model_name', type=str, default="lstm")
+    parser.add_argument('--model_name', type=str, default="lstm_tf")
     parser.add_argument('--load_checkpoint', type=str, default="", help="load checkpoint path to continue training")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--embed_dim', type=int, default=32)

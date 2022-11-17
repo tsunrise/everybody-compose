@@ -1,6 +1,6 @@
 from torch.utils.data import IterableDataset
 from preprocess.constants import DATASETS_CONFIG_PATH
-from preprocess.prepare import generate_sequences, load_prepared_dataset, prepare_raw_beats_notes
+from preprocess.prepare import generate_sequences_and_shifted, load_prepared_dataset, prepare_raw_beats_notes
 from preprocess.fetch import download
 
 import torch.utils.data
@@ -43,22 +43,24 @@ class BeatsRhythmsDataset(IterableDataset):
             for idx in self.indices:
                 # here: beats and notes represents beats and notes of one midi file
                 beats, notes = self.beats_list[idx], self.notes_list[idx]
-                yield from generate_sequences(beats, notes, self.seq_len, one_hot=True)
+                yield from generate_sequences_and_shifted(beats, notes, self.seq_len)
         else:
-            lo, hi = 0, len(self.beats_list)
-            per_worker = int(math.ceil((hi - lo) / float(worker_info.num_workers)))
-            worker_id = worker_info.id
-            worker_lo, worker_hi = lo + worker_id * per_worker, min(lo + (worker_id + 1) * per_worker, hi)
-            for idx in self.indices[worker_lo:worker_hi]:
-                beats, notes = self.beats_list[idx], self.notes_list[idx]
-                yield from generate_sequences(beats, notes, self.seq_len, one_hot=True)
+            # lo, hi = 0, len(self.beats_list)
+            # per_worker = int(math.ceil((hi - lo) / float(worker_info.num_workers)))
+            # worker_id = worker_info.id
+            # worker_lo, worker_hi = lo + worker_id * per_worker, min(lo + (worker_id + 1) * per_worker, hi)
+            # for idx in self.indices[worker_lo:worker_hi]:
+            #     beats, notes = self.beats_list[idx], self.notes_list[idx]
+            #     yield from generate_sequences_shifted(beats, notes, self.seq_len)
+            raise NotImplementedError("Multi-process data loading is not supported yet.")
     
     def __len__(self):
         return len(self.indices)
 
 
 def collate_fn(batch):
-    X, y = zip(*batch)
+    X, y, y_prev = zip(*batch)
     X = np.array(X)
     y = np.array(y)
-    return X, y
+    y_prev = np.array(y_prev)
+    return X, y, y_prev

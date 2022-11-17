@@ -2,6 +2,8 @@ from pynput import keyboard
 import numpy as np
 import time
 
+from utils.data_paths import DataPaths
+
 def on_press(key):
     '''
     listener that monitor presses of the space key
@@ -49,6 +51,11 @@ def create_beat():
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
     beat_sequence = np.column_stack((prev_rest, duration))
+    paths = DataPaths()
+    file_name = "pred_beat.npy"
+    file_path = paths.beats_rhythms_dir / file_name
+    np.save(file_path, beat_sequence)
+
     return beat_sequence
 
 

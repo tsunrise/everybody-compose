@@ -23,3 +23,5 @@ class DataPaths:
         self.midi_outputs_dir.mkdir(exist_ok=True)
         self.tensorboard_dir = self.cache_dir / "tensorboard"
         self.tensorboard_dir.mkdir(exist_ok=True)
+        self.beats_rhythms_dir = self.cache_dir / "beats_rhythms"
+        self.beats_rhythms_dir.mkdir(exist_ok=True)

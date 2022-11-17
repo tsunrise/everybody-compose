@@ -109,38 +109,48 @@ def parse_midi_to_input_and_labels(midi_file: IO[bytes], mono: bool=True) -> Tup
     return beats, output_notes
 
 
-def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int, one_hot: bool=True) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
+def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
     """
         Convert beats and notes into a sequence of training data using sliding window.
         Args:
             - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
             - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
             - `seq_length`: An integer represent the beat sequence length of each training example.
-            - `one_hot`: Whether to convert the notes to one hot encoding.
         Yields:
-            - numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
-            - numpy array of shape (seq_length, 128) if `one_hot` is True, or (seq_length, ) if `one_hot` is False. Each row represents a sequence of note using one hot encoding,
-                which is the expected note sequence that the network should predict given the beat sequence.
-                128 represents the range of possible notes in the training data.
+            - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
+            - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
     """
     for i in range(0, len(notes) - seq_length):
         X = beats[i:i + seq_length]
         y = notes[i:i + seq_length].reshape(-1,)
-        
-        if one_hot:
-            yield X, np.eye(128)[y]
-        else:
-            yield X, y
+        yield X, y
+
+def generate_sequences_and_shifted(beats: np.ndarray, notes: np.ndarray, seq_length: int, initial_note: int = 0) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """
+        Convert beats and notes into a sequence of training data using sliding window.
+        Args:
+            - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
+            - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
+            - `seq_length`: An integer represent the beat sequence length of each training example.
+        Yields:
+            - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
+            - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
+            - y_shifted: numpy array of shape (seq_length, ), where y_shifted[i] = y[i-1], and y_shifted[0] = initial_note if this is the first yield.
+    """
+    notes_shifted = np.roll(notes, 1)
+    notes_shifted[0] = initial_note
+    for i in range(0, len(notes) - seq_length):
+        X = beats[i:i + seq_length]
+        y = notes[i:i + seq_length].reshape(-1,)
+        y_shifted = notes_shifted[i:i + seq_length].reshape(-1,)
+        yield X, y, y_shifted
+    
 
 def _prepared_file_name(mono: bool = True, max_files: int = -1) -> str:
     """Get the name of the prepared file."""
     mono_str = "mono" if mono else "chord"
     mx_file_str = f"{max_files}_files" if max_files != -1 else "all_files"
     return f"prepared_{mono_str}_{mx_file_str}.pkl"
-
-def batch_one_hot(labels: np.ndarray, num_classes: int) -> np.ndarray:
-    """Convert a batch of labels to one hot encoding."""
-    return np.eye(num_classes)[labels]
 
 def _save_progress(obj, file_name: os.PathLike):
     """Save the progress of the preparation."""
