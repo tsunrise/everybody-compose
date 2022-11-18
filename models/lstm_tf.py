@@ -48,9 +48,9 @@ class DeepBeatsLSTM(nn.Module):
         X = self.concat_prev(x, y_prev_embed)
         # Concat input
         X_fc = self.concat_input_fc(X)
-        X_fc = self.concat_input_activation(X)
+        X_fc = self.concat_input_activation(X_fc)
         # residual connection
-        X_fc = X_fc + X
+        X = X_fc + X
 
         X, (h1, c1) = self.layer1(X, (h1_0, c1_0))
         X, (h2, c2) = self.layer2(X, (h2_0, c2_0))
