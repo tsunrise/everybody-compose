@@ -39,8 +39,8 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
     model.eval()
     dur_seq_t = torch.from_numpy(durs_seq).to(device)
     init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
-
-    notes_seq = model.sample(dur_seq_t, init_note_t, temperature) # TODO: temperature is a magic number
+    with torch.no_grad():
+        notes_seq = model.sample(dur_seq_t, init_note_t, temperature) # TODO: temperature is a magic number
     prev_rest_seq = durs_seq[:, 0] # (seq_length,)
     curr_durs_seq = durs_seq[:, 1] # (seq_length,)
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
         dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
         it = iter(dataset)
         # skip first 10 files
-        for _ in range(24):
+        for _ in range(300):
             next(it)
         X, _, _ = next(it)
         X[0][0] = 2.
@@ -87,6 +87,7 @@ if __name__ == '__main__':
 
     # load model
     model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    model.training = False
     if main_args.load_checkpoint:
         model.load_state_dict(torch.load(main_args.load_checkpoint))
     print(model)

@@ -75,9 +75,17 @@ class DeepBeatsLSTM(nn.Module):
             scores = scores.squeeze(0)
             scores = scores / temperature
             scores = torch.nn.functional.softmax(scores, dim=1)
-            y = torch.multinomial(scores, 1)
-            ys.append(y)
-        out = [y.item() for y in ys]
+
+            y_next = None
+            while y_next is None or y_next == ys[-1]:
+                top10 = torch.topk(scores, 3, dim=1)
+                indices, probs = top10.indices, top10.values
+                probs = probs / torch.sum(probs)
+                probs_idx = torch.multinomial(probs, 1)
+                y_next = indices[0, probs_idx]
+            # print(y_next)
+            ys.append(y_next)
+        out = [y.item() for y in ys[1:]]
         print(out)
         return np.array(out)
         
