@@ -20,6 +20,19 @@ from utils.data_paths import DataPaths
 def model_file_name(model_name, n_files, n_epochs):
     return "{}_{}_{}.pth".format(model_name, "all" if n_files == -1 else n_files, n_epochs)
 
+def initialize_model(model_name, n_notes, embed_dim, hidden_dim, device):
+    if model_name == "lstm":
+        model = DeepBeats(n_notes, embed_dim, hidden_dim).to(device)
+    elif model_name == "lstm_tf":
+        model = DeepBeatsLSTM(n_notes, embed_dim, hidden_dim).to(device)
+    elif model_name == "vanilla_rnn":
+        model = DeepBeats_VanillaRNN(n_notes, embed_dim, hidden_dim).to(device)
+    elif model_name == "bi_lstm":
+        model = DeepBeats_BiLSTM(n_notes, embed_dim, hidden_dim).to(device)
+    else:
+        raise NotImplementedError("Model {} is not implemented.".format(model_name))
+    return model
+
 def save_model(model, paths, model_name, n_files, n_epochs):
     model_file = model_file_name(model_name, n_files, n_epochs)
     model_path = paths.snapshots_dir / model_file
@@ -34,16 +47,7 @@ def train(args):
     print(f"Using {device} device")
 
     # initialize model
-    if args.model_name == "lstm":
-        model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    elif args.model_name == "lstm_tf":
-        model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    elif args.model_name == "vanilla_rnn":
-        model = DeepBeats_VanillaRNN(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    elif args.model_name == "bi_lstm":
-        model = DeepBeats_BiLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    else:
-        raise NotImplementedError("Model {} is not implemented.".format(args.model))
+    model = initialize_model(args.model_name, args.n_notes, args.embed_dim, args.hidden_dim, device)
     print(model)
 
     if args.load_checkpoint:

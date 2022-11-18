@@ -5,7 +5,10 @@ import numpy as np
 from models.lstm_tf import DeepBeatsLSTM
 import preprocess.dataset
 import torch
+from main import initialize_model
 from models.lstm import DeepBeats
+from models.vanilla_rnn import DeepBeats_VanillaRNN
+from models.bi_lstm import DeepBeats_BiLSTM
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
 
@@ -48,6 +51,7 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
+    parser.add_argument('--model_name', type=str, default="lstm_tf")
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
     parser.add_argument('--midi_filename', type=str, default="output.mid")
     parser.add_argument('--embed_dim', type=int, default=32)
@@ -86,7 +90,7 @@ if __name__ == '__main__':
 
 
     # load model
-    model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    model = initialize_model(main_args.model_name, main_args.n_notes, main_args.embed_dim, main_args.hidden_dim, device)
     if main_args.load_checkpoint:
         model.load_state_dict(torch.load(main_args.load_checkpoint))
     print(model)
