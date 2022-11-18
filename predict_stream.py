@@ -108,7 +108,7 @@ if __name__ == '__main__':
     model.training = False
     model.training = False
     if main_args.load_checkpoint:
-        model.load_state_dict(torch.load(main_args.load_checkpoint))
+        model.load_state_dict(torch.load(main_args.load_checkpoint, map_location=device))
     print(model)
 
     # generate notes seq given durs seq

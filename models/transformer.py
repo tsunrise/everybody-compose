@@ -147,6 +147,6 @@ def create_mask(src, tgt):
     tgt_mask = generate_square_subsequent_mask(tgt_seq_len)
     src_mask = torch.zeros((src_seq_len, src_seq_len),device=DEVICE).type(torch.bool)
 
-    src_padding_mask = torch.zeros((batch_size, src_seq_len)) # we don't have padding in our src/tgt
-    tgt_padding_mask = torch.zeros((batch_size, tgt_seq_len))
+    src_padding_mask = torch.zeros((batch_size, src_seq_len)).type(torch.bool)# we don't have padding in our src/tgt
+    tgt_padding_mask = torch.zeros((batch_size, tgt_seq_len)).type(torch.bool)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask

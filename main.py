@@ -53,7 +53,7 @@ def train(args):
 
     if args.load_checkpoint:
         filename = paths.snapshots_dir / args.load_checkpoint
-        model.load_state_dict(torch.load(filename))
+        model.load_state_dict(torch.load(filename, map_location=device))
         print(f'Checkpoint loaded {filename}')
 
     # define optimizer
@@ -95,6 +95,7 @@ def train(args):
                 # nn.Transformer takes seq_len * batch_size
                 input_seq, target_seq, target_prev_seq = input_seq.permute(1, 0, 2), target_seq.permute(1, 0), target_prev_seq.permute(1, 0)
                 src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(input_seq, target_prev_seq)
+                src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
                 output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
             else:
                 output, _ = model(input_seq, target_prev_seq)
