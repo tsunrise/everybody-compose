@@ -6,6 +6,8 @@ from models.lstm_tf import DeepBeatsLSTM
 import preprocess.dataset
 import torch
 from models.lstm import DeepBeats
+from models.lstm_tf import DeepBeatsLSTM
+from models.transformer import DeepBeatsTransformer
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
 
@@ -49,11 +51,15 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
+    parser.add_argument('--model_name', type=str, default="lstm")
     parser.add_argument('--midi_filename', type=str, default="output.mid")
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)
     parser.add_argument('--n_notes', type=int, default=128)
     parser.add_argument('--seq_len', type=int, default=64)
+    parser.add_argument('--num_encoder_layers', type=int, default=3)
+    parser.add_argument('--num_decoder_layers', type=int, default=3)
+    parser.add_argument('--num_head', type=int, default=8)
     parser.add_argument('--source', type=str, default="interactive")
     parser.add_argument('--init_note', type=int, default=60)
     parser.add_argument('--temperature', type=float, default=0.5)
@@ -83,13 +89,26 @@ if __name__ == '__main__':
             X[0][0] = 2.
     X = np.array(X, dtype=np.float32)
 
-
-
     # load model
-    model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    if main_args.model_name == "lstm":
+        model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    elif main_args.model_name == "transformer":
+        model = DeepBeatsTransformer(
+                    num_encoder_layers=main_args.num_encoder_layers, 
+                    num_decoder_layers=main_args.num_encoder_layers,
+                    emb_size=main_args.embed_dim,
+                    nhead=main_args.num_head,
+                    src_vocab_size=2,
+                    tgt_vocab_size=main_args.n_notes,
+                    dim_feedforward=main_args.hidden_dim
+                ).to(device)
+    else:
+        raise NotImplementedError("Model {} is not implemented.".format(main_args.model_name))
+
+    model.training = False
     model.training = False
     if main_args.load_checkpoint:
-        model.load_state_dict(torch.load(main_args.load_checkpoint))
+        model.load_state_dict(torch.load(main_args.load_checkpoint, map_location=device))
     print(model)
 
     # generate notes seq given durs seq
