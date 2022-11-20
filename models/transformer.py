@@ -40,7 +40,7 @@ class TokenEmbedding(nn.Module):
         return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
 
 # Seq2Seq Network
-class DeepBeatsTransformer(nn.Module):
+class DeepBeatsTransformer(nn.Transformer):
     def __init__(self,
                  num_encoder_layers: int,
                  num_decoder_layers: int,
@@ -110,7 +110,7 @@ class DeepBeatsTransformer(nn.Module):
         ys = torch.ones(1, 1).fill_(init_note).type(torch.long).to(DEVICE)
         for _ in range(src_seq_len): # output should be the same length with input
             memory = memory.to(DEVICE)
-            tgt_mask = (generate_square_subsequent_mask(ys.size(0))
+            tgt_mask = (self.generate_square_subsequent_mask(ys.size(0))
                         .type(torch.bool)).to(DEVICE)
             out = self.decode(ys, memory, tgt_mask)
             out = out.transpose(0, 1)
@@ -132,21 +132,15 @@ class DeepBeatsTransformer(nn.Module):
         ys = ys.squeeze(1).numpy()
         print(ys)
         return ys
-    
-def generate_square_subsequent_mask(sz):
-    mask = (torch.triu(torch.ones((sz, sz), device=DEVICE)) == 1).transpose(0, 1)
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-    return mask
 
+    def create_mask(self, src, tgt):
+        src_seq_len = src.shape[0]
+        tgt_seq_len = tgt.shape[0]
+        batch_size = src.shape[1]
 
-def create_mask(src, tgt):
-    src_seq_len = src.shape[0]
-    tgt_seq_len = tgt.shape[0]
-    batch_size = src.shape[1]
+        tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len)
+        src_mask = torch.zeros((src_seq_len, src_seq_len),device=DEVICE).type(torch.bool)
 
-    tgt_mask = generate_square_subsequent_mask(tgt_seq_len)
-    src_mask = torch.zeros((src_seq_len, src_seq_len),device=DEVICE).type(torch.bool)
-
-    src_padding_mask = torch.zeros((batch_size, src_seq_len)).type(torch.bool)# we don't have padding in our src/tgt
-    tgt_padding_mask = torch.zeros((batch_size, tgt_seq_len)).type(torch.bool)
-    return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
+        src_padding_mask = torch.zeros((batch_size, src_seq_len)).type(torch.bool)# we don't have padding in our src/tgt
+        tgt_padding_mask = torch.zeros((batch_size, tgt_seq_len)).type(torch.bool)
+        return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask

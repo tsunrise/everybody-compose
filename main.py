@@ -94,7 +94,7 @@ def train(args):
             if args.model_name == "transformer":
                 # nn.Transformer takes seq_len * batch_size
                 input_seq, target_seq, target_prev_seq = input_seq.permute(1, 0, 2), target_seq.permute(1, 0), target_prev_seq.permute(1, 0)
-                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(input_seq, target_prev_seq)
+                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = model.create_mask(input_seq, target_prev_seq)
                 src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
                 output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
             else:
@@ -102,7 +102,7 @@ def train(args):
             loss = model.loss_function(output, target_seq)
             train_batch_loss += loss.item()
             loss.backward()
-            model.clip_gradients_(5) # TODO: magic number
+            model.clip_gradients_(args.clip_gradients) # TODO: magic number
             optimizer.step()
             num_train_batches += 1
         
@@ -152,6 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_decoder_layers', type=int, default=3)
     parser.add_argument('--num_head', type=int, default=8)
     parser.add_argument('--seq_len', type=int, default=64)
+    parser.add_argument('--clip_gradients', type=float, default=5.0)
     parser.add_argument('--n_files', type=int, default=-1,
                         help='number of midi files to use for training')
     parser.add_argument('--snapshots_freq', type=int, default=10)
