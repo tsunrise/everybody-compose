@@ -7,12 +7,13 @@ import torch
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
 from models.lstm_tf import DeepBeatsLSTM
-from models.transformer import DeepBeatsTransformer, create_mask
+from models.transformer import DeepBeatsTransformer
 
 import utils.devices as devices
 from models.lstm import DeepBeats
 from models.vanilla_rnn import DeepBeatsVanillaRNN
 from models.bi_lstm import DeepBeatsBiLSTM
+from models.attention_rnn import DeepBeatsAttentionRNN
 from preprocess.constants import ADL_PIANO_TOTAL_SIZE
 from preprocess.dataset import BeatsRhythmsDataset, collate_fn
 from utils.data_paths import DataPaths
@@ -39,9 +40,11 @@ def train(args):
         model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     elif args.model_name == "lstm_tf":
         model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    elif model_name == "vanilla_rnn":
+    elif args.model_name == "vanilla_rnn":
         model = DeepBeatsVanillaRNN(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
-    elif model_name == "bi_lstm":
+    elif args.model_name == "attention_rnn":
+        model = DeepBeatsAttentionRNN(args.n_notes, args.embed_dim, args.hidden_dim, args.num_head).to(device)
+    elif args.model_name == "bi_lstm":
         model = DeepBeatsBiLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     elif args.model_name == "transformer":
         model = DeepBeatsTransformer(

@@ -4,9 +4,9 @@ import numpy as np
 from models.model_utils import ConcatPrev
 
 
-class DeepBeats_AttentionRNN(nn.Module):
-    def __init__(self, num_notes, embed_size, hidden_dim, num_head = 8):
-        super(DeepBeats_AttentionRNN, self).__init__()
+class DeepBeatsAttentionRNN(nn.Module):
+    def __init__(self, num_notes, embed_size, hidden_dim, num_head):
+        super(DeepBeatsAttentionRNN, self).__init__()
         self.num_notes = num_notes
         self.embed_size = embed_size
         self.hidden_dim = hidden_dim
