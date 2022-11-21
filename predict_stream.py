@@ -7,8 +7,8 @@ import preprocess.dataset
 import torch
 from main import initialize_model
 from models.lstm import DeepBeats
-from models.vanilla_rnn import DeepBeats_VanillaRNN
-from models.bi_lstm import DeepBeats_BiLSTM
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
 
