@@ -7,6 +7,7 @@ import torch
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
 from models.lstm_tf import DeepBeatsLSTM
+from models.transformer import DeepBeatsTransformer, create_mask
 
 import utils.devices as devices
 from models.lstm import DeepBeats
@@ -19,19 +20,6 @@ from utils.data_paths import DataPaths
 
 def model_file_name(model_name, n_files, n_epochs):
     return "{}_{}_{}.pth".format(model_name, "all" if n_files == -1 else n_files, n_epochs)
-
-def initialize_model(model_name, n_notes, embed_dim, hidden_dim, device):
-    if model_name == "lstm":
-        model = DeepBeats(n_notes, embed_dim, hidden_dim).to(device)
-    elif model_name == "lstm_tf":
-        model = DeepBeatsLSTM(n_notes, embed_dim, hidden_dim).to(device)
-    elif model_name == "vanilla_rnn":
-        model = DeepBeatsVanillaRNN(n_notes, embed_dim, hidden_dim).to(device)
-    elif model_name == "bi_lstm":
-        model = DeepBeatsBiLSTM(n_notes, embed_dim, hidden_dim).to(device)
-    else:
-        raise NotImplementedError("Model {} is not implemented.".format(model_name))
-    return model
 
 def save_model(model, paths, model_name, n_files, n_epochs):
     model_file = model_file_name(model_name, n_files, n_epochs)
@@ -46,13 +34,32 @@ def train(args):
     paths = DataPaths()
     print(f"Using {device} device")
 
-    # initialize model
-    model = initialize_model(args.model_name, args.n_notes, args.embed_dim, args.hidden_dim, device)
+    # initialize mdoel
+    if args.model_name == "lstm":
+        model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif args.model_name == "lstm_tf":
+        model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif model_name == "vanilla_rnn":
+        model = DeepBeatsVanillaRNN(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif model_name == "bi_lstm":
+        model = DeepBeatsBiLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif args.model_name == "transformer":
+        model = DeepBeatsTransformer(
+            num_encoder_layers=args.num_encoder_layers, 
+            num_decoder_layers=args.num_encoder_layers,
+            emb_size=args.embed_dim,
+            nhead=args.num_head,
+            src_vocab_size=2,
+            tgt_vocab_size=args.n_notes,
+            dim_feedforward=args.hidden_dim
+        ).to(device)
+    else:
+        raise NotImplementedError("Model {} is not implemented.".format(args.model))
     print(model)
 
     if args.load_checkpoint:
         filename = paths.snapshots_dir / args.load_checkpoint
-        model.load_state_dict(torch.load(filename))
+        model.load_state_dict(torch.load(filename, map_location=device))
         print(f'Checkpoint loaded {filename}')
 
     # define optimizer
@@ -90,11 +97,18 @@ def train(args):
             input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
             target_seq = torch.from_numpy(y).long().to(device)
             target_prev_seq = torch.from_numpy(y_prev).long().to(device)
-            output, _ = model(input_seq, target_prev_seq)
+            if args.model_name == "transformer":
+                # nn.Transformer takes seq_len * batch_size
+                input_seq, target_seq, target_prev_seq = input_seq.permute(1, 0, 2), target_seq.permute(1, 0), target_prev_seq.permute(1, 0)
+                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = model.create_mask(input_seq, target_prev_seq)
+                src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
+                output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+            else:
+                output, _ = model(input_seq, target_prev_seq)
             loss = model.loss_function(output, target_seq)
             train_batch_loss += loss.item()
             loss.backward()
-            model.clip_gradients_(5) # TODO: magic number
+            model.clip_gradients_(args.clip_gradients) # TODO: magic number
             optimizer.step()
             num_train_batches += 1
         
@@ -140,7 +154,11 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--n_epochs', type=int, default=10)
     parser.add_argument('--n_notes', type=int, default=128)
+    parser.add_argument('--num_encoder_layers', type=int, default=3)
+    parser.add_argument('--num_decoder_layers', type=int, default=3)
+    parser.add_argument('--num_head', type=int, default=8)
     parser.add_argument('--seq_len', type=int, default=64)
+    parser.add_argument('--clip_gradients', type=float, default=5.0)
     parser.add_argument('--n_files', type=int, default=-1,
                         help='number of midi files to use for training')
     parser.add_argument('--snapshots_freq', type=int, default=10)
