@@ -11,6 +11,8 @@ from models.transformer import DeepBeatsTransformer, create_mask
 
 import utils.devices as devices
 from models.lstm import DeepBeats
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
 from preprocess.constants import ADL_PIANO_TOTAL_SIZE
 from preprocess.dataset import BeatsRhythmsDataset, collate_fn
 from utils.data_paths import DataPaths
@@ -37,6 +39,10 @@ def train(args):
         model = DeepBeats(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     elif args.model_name == "lstm_tf":
         model = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif model_name == "vanilla_rnn":
+        model = DeepBeatsVanillaRNN(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    elif model_name == "bi_lstm":
+        model = DeepBeatsBiLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
     elif args.model_name == "transformer":
         model = DeepBeatsTransformer(
             num_encoder_layers=args.num_encoder_layers, 

@@ -5,9 +5,13 @@ import numpy as np
 from models.lstm_tf import DeepBeatsLSTM
 import preprocess.dataset
 import torch
+
 from models.lstm import DeepBeats
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
 from models.lstm_tf import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
+
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
 
@@ -50,6 +54,7 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
+    parser.add_argument('--model_name', type=str, default="lstm_tf")
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
     parser.add_argument('--model_name', type=str, default="lstm")
     parser.add_argument('--midi_filename', type=str, default="output.mid")
@@ -92,6 +97,12 @@ if __name__ == '__main__':
     # load model
     if main_args.model_name == "lstm":
         model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    elif args.model_name == "lstm_tf":
+        model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    elif model_name == "vanilla_rnn":
+        model = DeepBeatsVanillaRNN(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
+    elif model_name == "bi_lstm":
+        model = DeepBeatsBiLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
     elif main_args.model_name == "transformer":
         model = DeepBeatsTransformer(
                     num_encoder_layers=main_args.num_encoder_layers, 
@@ -105,7 +116,6 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError("Model {} is not implemented.".format(main_args.model_name))
 
-    model.training = False
     model.training = False
     if main_args.load_checkpoint:
         model.load_state_dict(torch.load(main_args.load_checkpoint, map_location=device))
