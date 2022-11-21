@@ -4,9 +4,9 @@ import numpy as np
 from models.model_utils import ConcatPrev
 
 
-class DeepBeats_VanillaRNN(nn.Module):
+class DeepBeatsVanillaRNN(nn.Module):
     def __init__(self, num_notes, embed_size, hidden_dim):
-        super(DeepBeats_VanillaRNN, self).__init__()
+        super(DeepBeatsVanillaRNN, self).__init__()
         self.num_notes = num_notes
         self.note_embedding = nn.Embedding(num_notes, embed_size)
         self.concat_prev = ConcatPrev()

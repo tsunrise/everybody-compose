@@ -10,8 +10,8 @@ from models.lstm_tf import DeepBeatsLSTM
 
 import utils.devices as devices
 from models.lstm import DeepBeats
-from models.vanilla_rnn import DeepBeats_VanillaRNN
-from models.bi_lstm import DeepBeats_BiLSTM
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
 from preprocess.constants import ADL_PIANO_TOTAL_SIZE
 from preprocess.dataset import BeatsRhythmsDataset, collate_fn
 from utils.data_paths import DataPaths
@@ -26,9 +26,9 @@ def initialize_model(model_name, n_notes, embed_dim, hidden_dim, device):
     elif model_name == "lstm_tf":
         model = DeepBeatsLSTM(n_notes, embed_dim, hidden_dim).to(device)
     elif model_name == "vanilla_rnn":
-        model = DeepBeats_VanillaRNN(n_notes, embed_dim, hidden_dim).to(device)
+        model = DeepBeatsVanillaRNN(n_notes, embed_dim, hidden_dim).to(device)
     elif model_name == "bi_lstm":
-        model = DeepBeats_BiLSTM(n_notes, embed_dim, hidden_dim).to(device)
+        model = DeepBeatsBiLSTM(n_notes, embed_dim, hidden_dim).to(device)
     else:
         raise NotImplementedError("Model {} is not implemented.".format(model_name))
     return model
