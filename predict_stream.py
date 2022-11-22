@@ -8,6 +8,7 @@ import torch
 
 from models.lstm import DeepBeats
 from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.attention_rnn import DeepBeatsAttentionRNN
 from models.bi_lstm import DeepBeatsBiLSTM
 from models.lstm_tf import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
@@ -54,7 +55,6 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
-    parser.add_argument('--model_name', type=str, default="lstm_tf")
     parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
     parser.add_argument('--model_name', type=str, default="lstm")
     parser.add_argument('--midi_filename', type=str, default="output.mid")
@@ -97,11 +97,13 @@ if __name__ == '__main__':
     # load model
     if main_args.model_name == "lstm":
         model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif args.model_name == "lstm_tf":
+    elif main_args.model_name == "lstm_tf":
         model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif model_name == "vanilla_rnn":
+    elif main_args.model_name == "vanilla_rnn":
         model = DeepBeatsVanillaRNN(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif model_name == "bi_lstm":
+    elif main_args.model_name == "attention_rnn":
+        model = DeepBeatsAttentionRNN(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim, main_args.num_head).to(device)
+    elif main_args.model_name == "bi_lstm":
         model = DeepBeatsBiLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
     elif main_args.model_name == "transformer":
         model = DeepBeatsTransformer(
