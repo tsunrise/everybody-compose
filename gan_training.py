@@ -5,6 +5,7 @@ import datetime
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
 from models.lstm_tf import DeepBeatsLSTM
@@ -103,7 +104,8 @@ def train(args):
 
             ## Train with all-fake batch
             # Generate fake image batch with G
-            fake, _ = netG(input_seq, target_prev_seq)
+            fake_logits, _ = netG(input_seq, target_prev_seq)
+            fake = F.gumbel_softmax(fake_logits, tau = args.temperature)
             label.fill_(fake_label)
             # Classify all fake batch with D
             output = netD(input_seq, fake.detach())
@@ -161,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--embed_dim', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=256)
+    parser.add_argument('--temperature', type=float, default=1)
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--n_epochs', type=int, default=10)
     parser.add_argument('--n_notes', type=int, default=128)
