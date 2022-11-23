@@ -1,49 +1,37 @@
-import os
-import pickle
-from typing import IO, Generator, Iterable, List, Optional, Tuple, Union
+from typing import IO, Tuple
 import zipfile
 
 import music21
 import numpy as np
-import toml
-import warnings
-from preprocess.constants import DATASETS_CONFIG_PATH
 
 from preprocess.fetch import download
 
-from tqdm import tqdm
-
-from utils.data_paths import DataPaths
-
-def download_midi_files(max_files = -1):
+def download_midi_files(dataset: str, midi_url: str):
     """Get an iterator over all MIDI files bytestreams.
     
     Returns:
         - `iterator`: An iterator over all MIDI files bytestreams.
         - `num_files`: The number of MIDI files.
     """
-    config = toml.load(DATASETS_CONFIG_PATH)
-    archives = [download(f"{filename}.zip", item["midi"]) for filename, item in config["datasets"].items()]
+    archive_path = download(f"{dataset}.zip", midi_url)
+    if archive_path is None:
+        raise RuntimeError("Failed to download the dataset.")
     # get number of midi files
     total = 0
-    for archive_path in archives:
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            for info in zip_ref.infolist():
-                if info.filename.endswith(".mid"):
+    with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+        for info in zip_ref.infolist():
+            if info.filename.endswith(".mid"):
                     total += 1
-    if max_files != -1:
-        total = min(total, max_files)
     # iterate over midi files
     def _iter():
         remaining = total
-        for archive_path in archives:
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                for info in zip_ref.infolist():
-                    if info.filename.endswith(".mid"):
-                        yield zip_ref.open(info)
-                        remaining -= 1
-                        if remaining == 0:
-                            return
+        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+            for info in zip_ref.infolist():
+                if info.filename.endswith(".mid"):
+                    yield info.filename, zip_ref.open(info)
+                    remaining -= 1
+                    if remaining == 0:
+                        return
     return _iter(), total
 
 
@@ -109,121 +97,121 @@ def parse_midi_to_input_and_labels(midi_file: IO[bytes], mono: bool=True) -> Tup
     return beats, output_notes
 
 
-def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
-    """
-        Convert beats and notes into a sequence of training data using sliding window.
-        Args:
-            - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
-            - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
-            - `seq_length`: An integer represent the beat sequence length of each training example.
-        Yields:
-            - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
-            - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
-    """
-    for i in range(0, len(notes) - seq_length):
-        X = beats[i:i + seq_length]
-        y = notes[i:i + seq_length].reshape(-1,)
-        yield X, y
+# def generate_sequences(beats: np.ndarray, notes: np.ndarray, seq_length: int) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
+#     """
+#         Convert beats and notes into a sequence of training data using sliding window.
+#         Args:
+#             - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
+#             - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
+#             - `seq_length`: An integer represent the beat sequence length of each training example.
+#         Yields:
+#             - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
+#             - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
+#     """
+#     for i in range(0, len(notes) - seq_length):
+#         X = beats[i:i + seq_length]
+#         y = notes[i:i + seq_length].reshape(-1,)
+#         yield X, y
 
-def generate_sequences_and_shifted(beats: np.ndarray, notes: np.ndarray, seq_length: int, initial_note: int = 0) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """
-        Convert beats and notes into a sequence of training data using sliding window.
-        Args:
-            - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
-            - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
-            - `seq_length`: An integer represent the beat sequence length of each training example.
-        Yields:
-            - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
-            - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
-            - y_shifted: numpy array of shape (seq_length, ), where y_shifted[i] = y[i-1], and y_shifted[0] = initial_note if this is the first yield.
-    """
-    notes_shifted = np.roll(notes, 1)
-    notes_shifted[0] = initial_note
-    for i in range(0, len(notes) - seq_length):
-        X = beats[i:i + seq_length]
-        y = notes[i:i + seq_length].reshape(-1,)
-        y_shifted = notes_shifted[i:i + seq_length].reshape(-1,)
-        yield X, y, y_shifted
+# def generate_sequences_and_shifted(beats: np.ndarray, notes: np.ndarray, seq_length: int, initial_note: int = 0) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+#     """
+#         Convert beats and notes into a sequence of training data using sliding window.
+#         Args:
+#             - `beats`: numpy array of shape (num_notes, 2). Each numpy array represents the beats of one midi file.
+#             - `notes`: numpy array of shape (num_notes, 1). Each numpy array represents the notes in one midi file.
+#             - `seq_length`: An integer represent the beat sequence length of each training example.
+#         Yields:
+#             - X: numpy array of shape (seq_length, 2). Each row represents a sequence of beats.
+#             - y: numpy array of shape (seq_length, ), which is the expected note sequence that the network should predict given the beat sequence.
+#             - y_shifted: numpy array of shape (seq_length, ), where y_shifted[i] = y[i-1], and y_shifted[0] = initial_note if this is the first yield.
+#     """
+#     notes_shifted = np.roll(notes, 1)
+#     notes_shifted[0] = initial_note
+#     for i in range(0, len(notes) - seq_length):
+#         X = beats[i:i + seq_length]
+#         y = notes[i:i + seq_length].reshape(-1,)
+#         y_shifted = notes_shifted[i:i + seq_length].reshape(-1,)
+#         yield X, y, y_shifted
     
 
-def _prepared_file_name(mono: bool = True, max_files: int = -1) -> str:
-    """Get the name of the prepared file."""
-    mono_str = "mono" if mono else "chord"
-    mx_file_str = f"{max_files}_files" if max_files != -1 else "all_files"
-    return f"prepared_{mono_str}_{mx_file_str}.pkl"
+# def _prepared_file_name(mono: bool = True, max_files: int = -1) -> str:
+#     """Get the name of the prepared file."""
+#     mono_str = "mono" if mono else "chord"
+#     mx_file_str = f"{max_files}_files" if max_files != -1 else "all_files"
+#     return f"prepared_{mono_str}_{mx_file_str}.pkl"
 
-def _save_progress(obj, file_name: os.PathLike):
-    """Save the progress of the preparation."""
-    with open(file_name, "wb") as f:
-        pickle.dump(obj, f)
+# def _save_progress(obj, file_name: os.PathLike):
+#     """Save the progress of the preparation."""
+#     with open(file_name, "wb") as f:
+#         pickle.dump(obj, f)
 
-def _load_progress(file_name: os.PathLike):
-    """Load the progress of the preparation."""
-    with open(file_name, "rb") as f:
-        return pickle.load(f)
+# def _load_progress(file_name: os.PathLike):
+#     """Load the progress of the preparation."""
+#     with open(file_name, "rb") as f:
+#         return pickle.load(f)
 
-def load_prepared_dataset(file_name: os.PathLike):
-    """Load prepared dataset."""
-    progress =  _load_progress(file_name)
-    return progress["beats_list"], progress["notes_list"]
+# def load_prepared_dataset(file_name: os.PathLike):
+#     """Load prepared dataset."""
+#     progress =  _load_progress(file_name)
+#     return progress["beats_list"], progress["notes_list"]
 
-def prepare_raw_beats_notes(mono: bool=True, max_files: int = -1, override: bool=False, progress_save_freq: int=100) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-    if not mono:
-        raise NotImplementedError("Polyphonic music is not supported yet.")
+# def prepare_raw_beats_notes(mono: bool=True, max_files: int = -1, override: bool=False, progress_save_freq: int=100) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+#     if not mono:
+#         raise NotImplementedError("Polyphonic music is not supported yet.")
 
-    file_name = _prepared_file_name(mono, max_files)
-    progress_name = f"{file_name}.progress"
-    paths = DataPaths()
-    file_path = paths.prepared_data_dir / file_name
-    progress_path = paths.prepared_data_dir / progress_name
-    if os.path.exists(file_path) and not override:
-        print(f"Found prepared data at {file_path}.")
-        progress = _load_progress(file_path)
-        return progress["beats_list"], progress["notes_list"]
+#     file_name = _prepared_file_name(mono, max_files)
+#     progress_name = f"{file_name}.progress"
+#     paths = DataPaths()
+#     file_path = paths.prepared_data_dir / file_name
+#     progress_path = paths.prepared_data_dir / progress_name
+#     if os.path.exists(file_path) and not override:
+#         print(f"Found prepared data at {file_path}.")
+#         progress = _load_progress(file_path)
+#         return progress["beats_list"], progress["notes_list"]
 
-    midi_iterator, count = download_midi_files(max_files)
-    beats_list, notes_list = [], []
-    warnings_cnt = 0
-    errors_cnt = 0
-    skip = 0
-    if os.path.exists(progress_path):
-        progress = _load_progress(progress_path)
-        beats_list, notes_list = progress["beats_list"], progress["notes_list"]
-        skip = len(beats_list)
-        print("Resuming from previous progress...")
+#     midi_iterator, count = download_midi_files(max_files)
+#     beats_list, notes_list = [], []
+#     warnings_cnt = 0
+#     errors_cnt = 0
+#     skip = 0
+#     if os.path.exists(progress_path):
+#         progress = _load_progress(progress_path)
+#         beats_list, notes_list = progress["beats_list"], progress["notes_list"]
+#         skip = len(beats_list)
+#         print("Resuming from previous progress...")
 
-    bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
-    for midi_file in midi_iterator:
-        if skip > 0:
-            skip -= 1
-            bar.update(1)
-            continue
-        with warnings.catch_warnings():
-            warnings.filterwarnings("error")
-            try:
-                beats, notes = parse_midi_to_input_and_labels(midi_file)
-                beats_list.append(beats)
-                notes_list.append(notes)
-            except Warning:
-                warnings_cnt += 1
-                bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
-                bar.update(1)
-                continue
-            except KeyboardInterrupt:
-                print(f"KeyboardInterrupt detected, saving progress and exit")
-                _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
-                exit()
-            except Exception:
-                errors_cnt += 1
-                bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
-                bar.update(1)
-                continue
-        bar.update(1)
-        if len(beats_list) % progress_save_freq == 0:
-            _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
+#     bar = tqdm(total=count, desc="Parsing MIDI files", unit="file", colour="blue")
+#     for midi_file in midi_iterator:
+#         if skip > 0:
+#             skip -= 1
+#             bar.update(1)
+#             continue
+#         with warnings.catch_warnings():
+#             warnings.filterwarnings("error")
+#             try:
+#                 beats, notes = parse_midi_to_input_and_labels(midi_file)
+#                 beats_list.append(beats)
+#                 notes_list.append(notes)
+#             except Warning:
+#                 warnings_cnt += 1
+#                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
+#                 bar.update(1)
+#                 continue
+#             except KeyboardInterrupt:
+#                 print(f"KeyboardInterrupt detected, saving progress and exit")
+#                 _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
+#                 exit()
+#             except Exception:
+#                 errors_cnt += 1
+#                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
+#                 bar.update(1)
+#                 continue
+#         bar.update(1)
+#         if len(beats_list) % progress_save_freq == 0:
+#             _save_progress({"beats_list": beats_list, "notes_list": notes_list}, progress_path)
 
-    bar.close()
+#     bar.close()
 
-    print(f"Saving prepared dataset to disk...")
-    _save_progress({"beats_list": beats_list, "notes_list": notes_list}, file_path)
-    return beats_list, notes_list
+#     print(f"Saving prepared dataset to disk...")
+#     _save_progress({"beats_list": beats_list, "notes_list": notes_list}, file_path)
+#     return beats_list, notes_list
