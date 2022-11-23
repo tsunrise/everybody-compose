@@ -93,7 +93,7 @@ def parse_midi_to_input_and_labels(midi_file: IO[bytes], mono: bool=True) -> Tup
             beats.append([prev_rest, durations[i]])
             output_notes.append(notes[i])
             prev_rest = 0
-    beats, output_notes = np.array(beats), np.array(output_notes).reshape(-1,1)
+    beats, output_notes = np.array(beats).astype(float), np.array(output_notes).reshape(-1,1)
     return beats, output_notes
 
 
