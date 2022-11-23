@@ -109,6 +109,7 @@ class BeatsRhythmsDataset(Dataset):
             bar.update(1)
             bar.set_postfix(warns=warnings_cnt, errors=errors_cnt)
             if len(self.metadata_list) % PREPROCESS_SAVE_FREQ == 0:
+                print(f"Saving progress to {progress_path}")
                 self.save_processed_to_file(progress_path)
         bar.close()
 
