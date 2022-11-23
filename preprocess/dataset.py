@@ -12,7 +12,7 @@ import csv
 from utils.data_paths import DataPaths
 from dataclasses import dataclass
 
-PREPROCESS_SAVE_FREQ = 100
+PREPROCESS_SAVE_FREQ = 32
 
 @dataclass
 class MetaData:
