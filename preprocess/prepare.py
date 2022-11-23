@@ -20,14 +20,14 @@ def download_midi_files(dataset: str, midi_url: str):
     total = 0
     with zipfile.ZipFile(archive_path, 'r') as zip_ref:
         for info in zip_ref.infolist():
-            if info.filename.endswith(".mid"):
+            if info.filename.endswith(".mid") or info.filename.endswith(".midi"):
                     total += 1
     # iterate over midi files
     def _iter():
         remaining = total
         with zipfile.ZipFile(archive_path, 'r') as zip_ref:
             for info in zip_ref.infolist():
-                if info.filename.endswith(".mid"):
+                if info.filename.endswith(".mid") or info.filename.endswith(".midi"):
                     yield info.filename, zip_ref.open(info)
                     remaining -= 1
                     if remaining == 0:

@@ -32,7 +32,7 @@ class BeatsRhythmsDataset(Dataset):
         self.rng = np.random.default_rng(seed)
         self.initial_note = initial_note
 
-    def load(self, dataset = "mastero", mono=True, force_prepare = False, seq_len = 64):
+    def load(self, dataset = "mastero", mono=True, force_prepare = False):
         assert mono, "Only mono is supported for now"
         paths = DataPaths()
         dataset_type = "mono" if mono else "chords"
@@ -48,8 +48,8 @@ class BeatsRhythmsDataset(Dataset):
             self.load_processed(state_dict)
             return
         ### Remotely processed data
-        config = toml.load(DATASETS_CONFIG_PATH)[dataset_type][dataset]
-        if "prepared" in config or force_prepare:
+        config = toml.load(DATASETS_CONFIG_PATH)["datasets"][dataset_type][dataset]
+        if "prepared" in config and not force_prepare:
             prepared = download(f"prepared_{dataset}_{dataset_type}.pkl", config["prepared"])
             if prepared is None:
                 raise ValueError("Failed to download prepared dataset")
@@ -60,7 +60,7 @@ class BeatsRhythmsDataset(Dataset):
         
         ## Preprocessing
         midi_files, num_files = download_midi_files(dataset, config["midi"])
-        metadata_path = download(f"metadata_{dataset}.pkl", config["metadata"])
+        metadata_path = download(f"metadata_{dataset}.csv", config["metadata"])
         assert metadata_path is not None, "Failed to download metadata"
         metadata = {}
         with open(metadata_path, "r", encoding="utf-8") as f:
@@ -91,9 +91,7 @@ class BeatsRhythmsDataset(Dataset):
             try:
                 beats, notes = parse_midi_to_input_and_labels(io)
                 self.beats_list.append(beats)
-                self.notes_list.append(notes)
-                self.metadata_list.append(metadata[filename])
-                self.name_to_idx[filename] = len(self.metadata_list) - 1
+                self.notes_list.append(notes) 
             except Warning:
                 warnings_cnt += 1
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
@@ -104,6 +102,10 @@ class BeatsRhythmsDataset(Dataset):
             except Exception:
                 errors_cnt += 1
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
+            if "truncate" in config:
+                filename = filename[len(config["truncate"]):]
+            self.metadata_list.append(metadata[filename])
+            self.name_to_idx[filename] = len(self.metadata_list) - 1
             bar.update(1)
             bar.set_postfix(warns=warnings_cnt, errors=errors_cnt)
             if len(self.metadata_list) % PREPROCESS_SAVE_FREQ == 0:

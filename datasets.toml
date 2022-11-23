@@ -1,5 +1,6 @@
-[datasets.mono]
-# All files should be a zip archive of MIDI files (it's ok to have recursive directories)
-mastero = {midi = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip", metadata = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0.csv"}
+[datasets.mono.mastero]
+midi = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
+metadata = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0.csv"
+truncate = "maestro-v3.0.0/"
 
 [datasets.chords]
