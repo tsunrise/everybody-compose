@@ -10,5 +10,7 @@ if __name__ == "__main__":
     mono = args.mono
     dataset = BeatsRhythmsDataset(seq_len = 64) #seq_len = 64 is not used
     dataset.load(mono = mono, force_prepare = True)
+    dataset.save_processed_to_cache()
+
     
     

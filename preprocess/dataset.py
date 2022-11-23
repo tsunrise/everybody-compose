@@ -21,6 +21,9 @@ class MetaData:
     split: str
     midi_filename: str
 
+def _processed_name(dataset: str, dataset_type:str):
+    return f"processed_{dataset}_{dataset_type}.pkl"
+
 class BeatsRhythmsDataset(Dataset):
     def __init__(self, seq_len, split_seed = 42, seed = 12345, initial_note: int = 60):
         self.seq_len = seq_len
@@ -31,13 +34,17 @@ class BeatsRhythmsDataset(Dataset):
         self.name_to_idx = {}
         self.rng = np.random.default_rng(seed)
         self.initial_note = initial_note
+        self.dataset = ""
+        self.dataset_type = ""
 
     def load(self, dataset = "mastero", mono=True, force_prepare = False):
         assert mono, "Only mono is supported for now"
         paths = DataPaths()
         dataset_type = "mono" if mono else "chords"
-        processed_path = paths.prepared_data_dir / f"processed_{dataset}_{dataset_type}.pkl"
+        processed_path = paths.prepared_data_dir / _processed_name(dataset, dataset_type)
         progress_path = paths.cache_dir / f"progress_{dataset}_{dataset_type}.pkl"
+        self.dataset = dataset
+        self.dataset_type = dataset_type
 
         ## Check if we have processed data
         ### Locally processed data
@@ -145,6 +152,12 @@ class BeatsRhythmsDataset(Dataset):
 
     def save_processed_to_file(self, path):
         with open(path, "wb") as f:
+            pickle.dump(self.save_processed(), f)
+
+    def save_processed_to_cache(self):
+        paths = DataPaths()
+        processed_path = paths.prepared_data_dir / _processed_name(self.dataset, self.dataset_type)
+        with open(processed_path, "wb") as f:
             pickle.dump(self.save_processed(), f)
 
     def load_processed(self, state_dict):
