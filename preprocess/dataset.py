@@ -25,14 +25,14 @@ def _processed_name(dataset: str, dataset_type:str):
     return f"processed_{dataset}_{dataset_type}.pkl"
 
 class BeatsRhythmsDataset(Dataset):
-    def __init__(self, seq_len, split_seed = 42, seed = 12345, initial_note: int = 60):
+    def __init__(self, seq_len, seed = 12345, initial_note: int = 60):
         self.seq_len = seq_len
-        self.split_seed = split_seed
         self.beats_list = []
         self.notes_list = []
         self.metadata_list = []
         self.name_to_idx = {}
         self.rng = np.random.default_rng(seed)
+        self.seed = seed
         self.initial_note = initial_note
         self.dataset = ""
         self.dataset_type = ""
@@ -165,6 +165,30 @@ class BeatsRhythmsDataset(Dataset):
         self.notes_list = state_dict["notes_list"]
         self.metadata_list = state_dict["metadata_list"]
         self.name_to_idx = state_dict["name_to_idx"]
+
+    def gather(self, indices):
+        dataset = BeatsRhythmsDataset(self.seq_len, self.seed, self.initial_note)
+        dataset.beats_list = [self.beats_list[i] for i in indices]
+        dataset.notes_list = [self.notes_list[i] for i in indices]
+        dataset.metadata_list = [self.metadata_list[i] for i in indices]
+        dataset.name_to_idx = {v.midi_filename: i for i, v in enumerate(dataset.metadata_list)}
+        return dataset
+
+    def train_val_split(self, seed=0, val_ratio=0.1):
+        rng = np.random.default_rng(seed)
+        indices = np.arange(len(self.metadata_list))
+        rng.shuffle(indices)
+        val_size = int(len(self.metadata_list) * val_ratio)
+        train_indices = indices[val_size:]
+        dev_indices = indices[:val_size]
+        return self.gather(train_indices), self.gather(dev_indices)
+
+    def subset(self, max_len):
+        rng = np.random.default_rng(0)
+        indices = np.arange(len(self.metadata_list))
+        rng.shuffle(indices)
+        indices = indices[:max_len]
+        return self.gather(indices)
 
     def generate_midi(self, idx, path = "output.mid"):
         raise NotImplementedError()

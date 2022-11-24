@@ -1,0 +1,6 @@
+[global]
+dataset = "mastero"
+random_slice_seed = 123
+val_ratio = 0.1
+train_val_split_seed = 666
+initial_note = 60
