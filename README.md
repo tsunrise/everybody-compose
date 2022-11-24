@@ -3,6 +3,7 @@
 ## Install
 ```
 git clone https://github.com/tsunrise/cs230-proj.git
+cd cs230-proj
 pip -r requirements.txt
 ```
 ## Training
