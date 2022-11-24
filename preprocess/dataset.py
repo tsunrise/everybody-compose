@@ -56,8 +56,8 @@ class BeatsRhythmsDataset(Dataset):
             return
         ### Remotely processed data
         config = toml.load(DATASETS_CONFIG_PATH)["datasets"][dataset_type][dataset]
-        if "prepared" in config and not force_prepare:
-            prepared = download(f"prepared_{dataset}_{dataset_type}.pkl", config["prepared"])
+        if "processed" in config and not force_prepare:
+            prepared = download(f"processed_{dataset}_{dataset_type}.pkl", config["processed"])
             if prepared is None:
                 raise ValueError("Failed to download prepared dataset")
             with open(prepared, "rb") as f:
