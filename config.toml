@@ -4,3 +4,42 @@ random_slice_seed = 123
 val_ratio = 0.1
 train_val_split_seed = 666
 initial_note = 60
+
+[transformer]
+# @violetyao add config here :)
+
+[lstm]
+lr = 1e-3 # TODO: we can use a learning rate scheduler
+seq_len = 64
+batch_size = 64
+n_notes = 128
+embed_dim = 32
+hidden_dim = 256
+clip_grad = 5.0
+
+[vanilla_rnn]
+lr = 1e-3 
+seq_len = 64
+batch_size = 64
+n_notes = 128
+embed_dim = 32
+hidden_dim = 256
+clip_grad = 5.0
+
+[attention_rnn]
+lr = 1e-3 
+seq_len = 64
+batch_size = 64
+n_notes = 128
+embed_dim = 32
+hidden_dim = 256
+clip_grad = 5.0
+
+[bi_lstm]
+lr = 1e-3 
+seq_len = 64
+batch_size = 64
+n_notes = 128
+embed_dim = 32
+hidden_dim = 256
+clip_grad = 5.0

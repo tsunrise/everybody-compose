@@ -67,11 +67,12 @@ def load_checkpoint(checkpoint_path, model, device):
 
 def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots_freq:int=10, checkpoint: Optional[str] = None):
     config = toml.load(CONFIG_PATH)
-    model = get_model(model_name, config, device)
-    print(model)
 
     global_config = config["global"]
     model_config = config[model_name]
+
+    model = get_model(model_name, model_config, device)
+    print(model)
 
     dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
     dataset.load(global_config["dataset"])
@@ -93,7 +94,7 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     # TODO: we can use a learning rate scheduler here
     paths = DataPaths()
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-    log_dir = paths.tensorboard_dir / "{}_{}/{}".format(model, "all" if n_files == -1 else n_files, current_time)
+    log_dir = paths.tensorboard_dir / "{}_{}/{}".format(model_name, "all" if n_files == -1 else n_files, current_time)
     writer = SummaryWriter(log_dir = log_dir, flush_secs= 60)
     
     best_val_loss = float("inf")
@@ -105,9 +106,9 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
         model.train()
         for batch in train_loader:
             optimizer.zero_grad()
-            input_seq = torch.from_numpy(batch["beats"].astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(batch["notes"]).long().to(device)
-            target_prev_seq = torch.from_numpy(batch["notes_shifted"]).long().to(device)
+            input_seq = batch["beats"].to(device)
+            target_seq = batch["notes"].long().to(device)
+            target_prev_seq = batch["notes_shifted"].long().to(device)
             output = model_forward(model_name, model, input_seq, target_seq, target_prev_seq, device)
             loss = model.loss_function(output, target_seq)
             train_batch_loss += loss.item()
@@ -118,9 +119,9 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
         
         model.eval()
         for batch in val_loader:
-            input_seq = torch.from_numpy(batch["beats"].astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(batch["notes"]).long().to(device)
-            target_prev_seq = torch.from_numpy(batch["notes_shifted"]).long().to(device)
+            input_seq = batch["beats"].to(device)
+            target_seq = batch["notes"].long().to(device)
+            target_prev_seq = batch["notes_shifted"].long().to(device)
             with torch.no_grad():
                 output = model_forward(model_name, model, input_seq, target_seq, target_prev_seq, device)
             loss = model.loss_function(output, target_seq)

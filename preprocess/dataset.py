@@ -137,9 +137,9 @@ class BeatsRhythmsDataset(Dataset):
         else:
             notes_shifted[0] = self.notes_list[idx][lo - 1]
         return {
-            "beats": beats,
-            "notes": notes,
-            "notes_shifted": notes_shifted,
+            "beats": beats.astype(np.float32),
+            "notes": notes.astype(np.int32).ravel(),
+            "notes_shifted": notes_shifted.astype(np.int32).ravel(),
         }
 
     def save_processed(self) -> dict:
