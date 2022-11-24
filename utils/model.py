@@ -26,7 +26,7 @@ def get_model(name, config, device):
             num_encoder_layers=config["num_encoder_layers"], 
             num_decoder_layers=config["num_encoder_layers"],
             emb_size=config["embed_dim"],
-            nhead= config["num_head"],
+            nhead= config["num_heads"],
             src_vocab_size=config["src_vocab_size"],
             tgt_vocab_size=config["n_notes"],
             dim_feedforward=config["hidden_dim"]
@@ -39,6 +39,7 @@ def model_forward(model_name, model, input_seq: torch.Tensor, target_seq: torch.
         # nn.Transformer takes seq_len * batch_size
         input_seq, target_seq, target_prev_seq = input_seq.permute(1, 0, 2), target_seq.permute(1, 0), target_prev_seq.permute(1, 0)
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = model.create_mask(input_seq, target_prev_seq)
+        src_mask, tgt_mask = src_mask.to(device), tgt_mask.to(device)
         src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
         output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
     else:

@@ -6,7 +6,18 @@ train_val_split_seed = 666
 initial_note = 60
 
 [transformer]
-# @violetyao add config here :)
+lr = 1e-3 # TODO: we can use a learning rate scheduler
+seq_len = 128
+batch_size = 64
+n_notes = 128
+embed_dim = 128
+hidden_dim = 256
+clip_grad = 5.0
+num_encoder_layers = 3
+num_decoder_layers = 3
+num_heads = 8
+src_vocab_size = 2
+tgt_vocab_size = 128
 
 [lstm]
 lr = 1e-3 # TODO: we can use a learning rate scheduler

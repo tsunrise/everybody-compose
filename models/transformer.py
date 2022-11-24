@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from torch.nn import Transformer
 import math
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 """
 Code adapted from: https://pytorch.org/tutorials/beginner/translation_transformer.html
@@ -63,6 +62,12 @@ class DeepBeatsTransformer(nn.Transformer):
         self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
+        self.device = 'cpu'
+    
+    def to(self, device):
+        super(DeepBeatsTransformer, self).to(device)
+        self.device = device   
+        return self
 
     def forward(self,
                 src: Tensor,
@@ -103,15 +108,15 @@ class DeepBeatsTransformer(nn.Transformer):
         src = src.unsqueeze(1) # seq_len * 1 * 2
         src_seq_len = src.shape[0]
         src_mask = (torch.zeros(src_seq_len, src_seq_len)).type(torch.bool)
-        src = src.to(DEVICE)
-        src_mask = src_mask.to(DEVICE)
+        src = src.to(self.device)
+        src_mask = src_mask.to(self.device)
 
         memory = self.encode(src, src_mask)
-        ys = torch.ones(1, 1).fill_(init_note).type(torch.long).to(DEVICE)
+        ys = torch.ones(1, 1).fill_(init_note).type(torch.long).to(self.device)
         for _ in range(src_seq_len): # output should be the same length with input
-            memory = memory.to(DEVICE)
+            memory = memory.to(self.device)
             tgt_mask = (self.generate_square_subsequent_mask(ys.size(0))
-                        .type(torch.bool)).to(DEVICE)
+                        .type(torch.bool)).to(self.device)
             out = self.decode(ys, memory, tgt_mask)
             out = out.transpose(0, 1)
             scores = self.generator(out[:, -1]) # 1 * num_notes
@@ -139,7 +144,7 @@ class DeepBeatsTransformer(nn.Transformer):
         batch_size = src.shape[1]
 
         tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len)
-        src_mask = torch.zeros((src_seq_len, src_seq_len),device=DEVICE).type(torch.bool)
+        src_mask = torch.zeros((src_seq_len, src_seq_len)).type(torch.bool)
 
         src_padding_mask = torch.zeros((batch_size, src_seq_len)).type(torch.bool)# we don't have padding in our src/tgt
         tgt_padding_mask = torch.zeros((batch_size, tgt_seq_len)).type(torch.bool)
