@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     main_args = parser.parse_args()
     model_name = main_args.model_name
-    checkpoint_path = main_args.load_checkpoint
+    checkpoint_path = main_args.checkpoint_path
     midi_filename = main_args.midi_filename
     device = main_args.device
     source = main_args.source
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     model = get_model(main_args.model_name, model_config, main_args.device)
 
     model.eval()
-    load_checkpoint(model, checkpoint_path, device)
+    load_checkpoint(checkpoint_path, model, device)
     print(model)
 
     # generate notes seq given durs seq
