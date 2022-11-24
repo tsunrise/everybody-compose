@@ -2,19 +2,14 @@ import argparse
 
 import music21
 import numpy as np
-from models.lstm_tf import DeepBeatsLSTM
+from models.lstm import DeepBeatsLSTM
 import preprocess.dataset
 import torch
-
-from models.lstm import DeepBeats
-from models.vanilla_rnn import DeepBeatsVanillaRNN
-from models.attention_rnn import DeepBeatsAttentionRNN
-from models.bi_lstm import DeepBeatsBiLSTM
-from models.lstm_tf import DeepBeatsLSTM
-from models.transformer import DeepBeatsTransformer
+import toml
 
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
+from utils.model import CONFIG_PATH, get_model, load_checkpoint
 
 
 def write_to_midi(music, filename):
@@ -31,10 +26,14 @@ def convert_to_stream(notes, prev_rest, curr_durs):
     for n, r, d in zip(notes, prev_rest, curr_durs):
         if r:
             a = music21.note.Rest()
-            a.duration.quarterLength = float(r)
+            # TODO: quarterLength is not necessarily the same as duration
+            # quarterLength=1 is a whole note, quarterLength=0.25 is a quarter note
+            # each note takes 4 seconds when tempo=60
+            # we might also need to quantize this
+            a.duration.quarterLength = float(r * 2) # TODO: hack
             s.append(a)
         a = music21.note.Note(n)
-        a.duration.quarterLength = float(d)
+        a.duration.quarterLength = float(d * 2) # TODO: hack
         s.append(a)
     return s
 
@@ -47,7 +46,7 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
     dur_seq_t = torch.from_numpy(durs_seq).to(device)
     init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
     with torch.no_grad():
-        notes_seq = model.sample(dur_seq_t, init_note_t, temperature) # TODO: temperature is a magic number
+        notes_seq = model.sample(dur_seq_t, init_note_t, temperature)
     prev_rest_seq = durs_seq[:, 0] # (seq_length,)
     curr_durs_seq = durs_seq[:, 1] # (seq_length,)
 
@@ -55,22 +54,26 @@ def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
-    parser.add_argument('--load_checkpoint', type=str, default=".project_data/snapshots/lstm_all_10.pth")
-    parser.add_argument('--model_name', type=str, default="lstm")
-    parser.add_argument('--midi_filename', type=str, default="output.mid")
-    parser.add_argument('--embed_dim', type=int, default=32)
-    parser.add_argument('--hidden_dim', type=int, default=256)
-    parser.add_argument('--n_notes', type=int, default=128)
-    parser.add_argument('--seq_len', type=int, default=64)
-    parser.add_argument('--num_encoder_layers', type=int, default=3)
-    parser.add_argument('--num_decoder_layers', type=int, default=3)
-    parser.add_argument('--num_head', type=int, default=8)
-    parser.add_argument('--source', type=str, default="interactive")
-    parser.add_argument('--init_note', type=int, default=60)
-    parser.add_argument('--temperature', type=float, default=0.5)
+    parser.add_argument('-m','--model_name', type=str)
+    parser.add_argument('-c','--checkpoint_path', type=str)
+    parser.add_argument('-o','--midi_filename', type=str, default="output.mid")
+    parser.add_argument('-d','--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('-s','--source', type=str, default="interactive")
+    parser.add_argument('-i','--init_note', type=int, default=60)
+    parser.add_argument('-t','--temperature', type=float, default=0.5)
 
     main_args = parser.parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_name = main_args.model_name
+    checkpoint_path = main_args.checkpoint_path
+    midi_filename = main_args.midi_filename
+    device = main_args.device
+    source = main_args.source
+    init_note = main_args.init_note
+    temperature = main_args.temperature
+
+    config = toml.load(CONFIG_PATH)
+    global_config = config['global']
+    model_config = config[main_args.model_name]
 
     paths = DataPaths()
 
@@ -81,13 +84,9 @@ if __name__ == '__main__':
         # convert to float32
         X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
-        dataset = preprocess.dataset.BeatsRhythmsDataset(num_files=1)
-        it = iter(dataset)
-        # skip first 10 files
-        for _ in range(300):
-            next(it)
-        X, _, _ = next(it)
-        X[0][0] = 2.
+        dataset = preprocess.dataset.BeatsRhythmsDataset(64) # not used
+        idx = np.random.randint(0, len(dataset))
+        X = dataset.beats_list[idx]
     else:
         with open(main_args.source, 'rb') as f:
             X = np.load(f, allow_pickle=True)
@@ -95,32 +94,11 @@ if __name__ == '__main__':
     X = np.array(X, dtype=np.float32)
 
     # load model
-    if main_args.model_name == "lstm":
-        model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif main_args.model_name == "lstm_tf":
-        model = DeepBeatsLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif main_args.model_name == "vanilla_rnn":
-        model = DeepBeatsVanillaRNN(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif main_args.model_name == "attention_rnn":
-        model = DeepBeatsAttentionRNN(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim, main_args.num_head).to(device)
-    elif main_args.model_name == "bi_lstm":
-        model = DeepBeatsBiLSTM(main_args.n_notes, main_args.embed_dim, main_args.hidden_dim).to(device)
-    elif main_args.model_name == "transformer":
-        model = DeepBeatsTransformer(
-                    num_encoder_layers=main_args.num_encoder_layers, 
-                    num_decoder_layers=main_args.num_encoder_layers,
-                    emb_size=main_args.embed_dim,
-                    nhead=main_args.num_head,
-                    src_vocab_size=2,
-                    tgt_vocab_size=main_args.n_notes,
-                    dim_feedforward=main_args.hidden_dim
-                ).to(device)
-    else:
-        raise NotImplementedError("Model {} is not implemented.".format(main_args.model_name))
 
-    model.training = False
-    if main_args.load_checkpoint:
-        model.load_state_dict(torch.load(main_args.load_checkpoint, map_location=device))
+    model = get_model(main_args.model_name, model_config, main_args.device)
+
+    model.eval()
+    load_checkpoint(checkpoint_path, model, device)
     print(model)
 
     # generate notes seq given durs seq

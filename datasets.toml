@@ -1,4 +1,7 @@
-[datasets]
-# All files should be a zip archive of MIDI files (it's ok to have recursive directories)
-adl-piano-midi = {midi = "https://r2.tomshen.io/cs230/adl-piano-midi.zip", prepared = "https://r2.tomshen.io/cs230/prepared_mono_all_files.pkl"}
-# mastero = {midi = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip", metadata = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0.csv"}
+[datasets.mono.mastero]
+midi = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
+metadata = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0.csv"
+truncate = "maestro-v3.0.0/"
+processed = "https://r2.tomshen.io/cs230/processed_mastero_mono.pkl"
+
+[datasets.chords]

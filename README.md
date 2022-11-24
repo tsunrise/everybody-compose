@@ -1,7 +1,46 @@
 # CS 230 Final Project: Everybody Compose: Deep Beats To Music 
 
+## Install
+```
+git clone https://github.com/tsunrise/cs230-proj.git
+cd cs230-proj
+pip -r requirements.txt
+```
+## Training
+- Training
+```
+python ./main.py -m <model_name> -n <num_epochs>
+```
+Example: 
+```
+python ./main.py -m lstm -n 1000
+```
+- Training with checkpoint
+```
+python ./main.py -m <model_name> -n <num_epochs> -c <checkpoint_path>
+```
+Example:
+```
+python ./main.py -m lstm -n 600 -c .\.project_data\snapshots\lstm_all_300.pth
+```
+## Prediction
+- Predict Using Interactive Input
+```
+python .\predict_stream.py -m <model_name> -c <checkpoint_path>
+```
+- Predict using recorded interactive input
+```
+python .\predict_stream.py -m <model_name> -c <checkpoint_path> --source <record_file_path>
+```
+- "Recolor" a random MIDI file in dataset
+```
+python .\predict_stream.py -m <model_name> -c <checkpoint_path> --source dataset
+```
+
+# Cheatsheets (For Dev Only)
+
 Log into AWS server:
-`ssh -i "~/.ssh/cs230_aws_key.pem" ubuntu@ec2-34-220-120-34.us-west-2.compute.amazonaws.com`
+`ssh -i "~/.ssh/cs230_aws_key.pem" ubuntu@<AWS address>`
 
 Using tmux is recommended to avoid potential lost of progress due to disconnction. Start a new tmux session:
 `tmux new`
