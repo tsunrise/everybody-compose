@@ -51,23 +51,29 @@ def _parse_midi_to_notes_durations(midi_file: IO[bytes], mono: bool=True):
     
     notes = []
     durations = []
-
+    #set default time signature and tempo of midi file
+    signature_denom = 4
+    tempo = 120
     for e in flattened:
-        if isinstance(e, music21.chord.Chord):
+        if isinstance(e, music21.meter.TimeSignature):
+            signature_denom = e.denominator # the note value represent one beat (the beat unit)
+        elif isinstance(e, music21.tempo.MetronomeMark):
+            tempo = e.number # beats per minute
+        elif isinstance(e, music21.chord.Chord):
             if mono:
                 # only use highest pitch
                 notes.append(max(e.pitches).midi)
             else:
                 notes.append([n.midi for n in e.pitches])
-            durations.append(e.duration.quarterLength)
+            durations.append(e.duration.quarterLength * 60 / tempo * signature_denom / 4)
 
         elif isinstance(e, music21.note.Note):
             notes.append(e.pitch.midi)
-            durations.append(e.duration.quarterLength)
+            durations.append(e.duration.quarterLength * 60 / tempo * signature_denom / 4)
 
         elif isinstance(e, music21.note.Rest):
             notes.append(None)
-            durations.append(e.duration.quarterLength)
+            durations.append(e.duration.quarterLength * 60 / tempo * signature_denom / 4)
         
     return notes, durations
 
