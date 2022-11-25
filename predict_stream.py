@@ -86,6 +86,7 @@ if __name__ == '__main__':
         X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(64) # not used
+        dataset.load(global_config["dataset"])
         idx = np.random.randint(0, len(dataset))
         X = dataset.beats_list[idx]
     else:
