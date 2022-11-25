@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
-from models.lstm_tf import DeepBeatsLSTM
+from models.lstm import DeepBeatsLSTM
 from models.cnn_discriminator import CNNDiscriminator
 
 import utils.devices as devices
