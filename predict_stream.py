@@ -10,6 +10,7 @@ import toml
 from utils.data_paths import DataPaths
 from utils.beats_generator import create_beat
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
+from utils.sample import greedy_search
 
 
 def write_to_midi(music, filename):
@@ -37,16 +38,17 @@ def convert_to_stream(notes, prev_rest, curr_durs):
         s.append(a)
     return s
 
-def predict_notes_sequence(durs_seq, model, init_note, device, temperature):
+def predict_notes_sequence(durs_seq, model, device, profile):
     """
     Predict notes sequence given durations sequence
     """
     model.to(device)
     model.eval()
-    dur_seq_t = torch.from_numpy(durs_seq).to(device)
-    init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
     with torch.no_grad():
-        notes_seq = model.sample(dur_seq_t, init_note_t, temperature)
+        if profile["strategy"] == "greedy":
+            notes_seq = greedy_search(model, durs_seq, device, profile["top_p"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
+        else:
+            raise NotImplementedError("Strategy {} not implemented".format(profile["strategy"]))
     prev_rest_seq = durs_seq[:, 0] # (seq_length,)
     curr_durs_seq = durs_seq[:, 1] # (seq_length,)
 
@@ -58,9 +60,9 @@ if __name__ == '__main__':
     parser.add_argument('-c','--checkpoint_path', type=str)
     parser.add_argument('-o','--midi_filename', type=str, default="output.mid")
     parser.add_argument('-d','--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('-s','--source', type=str, default="interactive")
-    parser.add_argument('-i','--init_note', type=int, default=60)
-    parser.add_argument('-t','--temperature', type=float, default=0.5)
+    parser.add_argument('-s','--source', type=str, default="interactive", help="interactive, dataset, or path to recorded beats")
+    parser.add_argument('--take', type=int, default=256, help="for dataset only: number of beats to take from dataset")
+    parser.add_argument('-p','--profile', type=str, default="default", help="sampling profile name in config.toml")
 
     main_args = parser.parse_args()
     model_name = main_args.model_name
@@ -68,12 +70,12 @@ if __name__ == '__main__':
     midi_filename = main_args.midi_filename
     device = main_args.device
     source = main_args.source
-    init_note = main_args.init_note
-    temperature = main_args.temperature
+    beats_to_take = main_args.take
+    profile = main_args.profile
 
     config = toml.load(CONFIG_PATH)
     global_config = config['global']
-    model_config = config[main_args.model_name]
+    model_config = config["model"][main_args.model_name]
 
     paths = DataPaths()
 
@@ -85,8 +87,9 @@ if __name__ == '__main__':
         X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(64) # not used
+        dataset.load(global_config["dataset"])
         idx = np.random.randint(0, len(dataset))
-        X = dataset.beats_list[idx]
+        X = dataset.beats_list[idx][:beats_to_take]
     else:
         with open(main_args.source, 'rb') as f:
             X = np.load(f, allow_pickle=True)
@@ -96,7 +99,6 @@ if __name__ == '__main__':
     # load model
 
     model = get_model(main_args.model_name, model_config, main_args.device)
-
     model.eval()
     load_checkpoint(checkpoint_path, model, device)
     print(model)
@@ -105,9 +107,8 @@ if __name__ == '__main__':
     notes, prev_rest, curr_durs = predict_notes_sequence(
         durs_seq = X.copy(), # select the first durs seq for now, batch size = 1
         model=model,
-        init_note=main_args.init_note,
         device=device,
-        temperature=main_args.temperature
+        profile=config["sampling"][profile]
     )
 
     # convert stream to midi

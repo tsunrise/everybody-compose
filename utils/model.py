@@ -70,7 +70,7 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     config = toml.load(CONFIG_PATH)
 
     global_config = config["global"]
-    model_config = config[model_name]
+    model_config = config["model"][model_name]
 
     model = get_model(model_name, model_config, device)
     print(model)
