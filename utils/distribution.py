@@ -51,4 +51,5 @@ class LSTMDistribution(DistributionGenerator):
         scores, hidden = self.model.forward(x_curr, y_prev, hidden)
         scores = scores.squeeze(0)
         scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
         return {"position": position + 1, "hidden": hidden}, scores

@@ -8,7 +8,7 @@ import torch
 import toml
 
 from utils.data_paths import DataPaths
-from utils.beats_generator import create_beat
+# from utils.beats_generator import create_beat
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
 from utils.sample import greedy_search
 
@@ -51,7 +51,7 @@ def predict_notes_sequence(durs_seq, model, device, profile):
             raise NotImplementedError("Strategy {} not implemented".format(profile["strategy"]))
     prev_rest_seq = durs_seq[:, 0] # (seq_length,)
     curr_durs_seq = durs_seq[:, 1] # (seq_length,)
-
+    print(notes_seq)
     return notes_seq, prev_rest_seq, curr_durs_seq
 
 if __name__ == '__main__':

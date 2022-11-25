@@ -29,9 +29,13 @@ def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, 
     - `sampled_note`: an integer representing the sampled note
     - `conditional_likelihood`: the conditional likelihood of the sampled note: P(note | sampled_sequence). This will be useful for beam search.
     """
+    assert distribution.shape[0] == 128
+    assert len(distribution.shape) == 1
     assert 0 <= top_p <= 1, "top_p must be between 0 and 1"
     assert 0 <= repeat_decay <= 1, "repeat_decay must be between 0 and 1"
     assert temperature > 0, "temperature must be positive"
+    # penalize previous note
+    distribution[prev_note] *= (1 - repeat_decay)
     # sample only the top p of the distribution
     sorted_prob, sorted_idx = torch.sort(distribution, descending=True)
     cumsum_prob = torch.cumsum(sorted_prob, dim=0)
@@ -41,14 +45,12 @@ def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, 
     top_p_distribution = distribution[top_p_idx]
     # normalize the distribution
     top_p_distribution = top_p_distribution / top_p_distribution.sum()
-    # penalize previous note
-    top_p_distribution[prev_note] *= (1 - repeat_decay)
     # apply temperature
     top_p_distribution = top_p_distribution / temperature
     # sample
     sampled_note = int(torch.multinomial(top_p_distribution, 1).item())
     conditional_likelihood = top_p_distribution[sampled_note].item()
-    return top_p_idx[sampled_note], conditional_likelihood
+    return top_p_idx[sampled_note].item(), conditional_likelihood
 
 def greedy_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, repeat_decay: float = 0.5, initial_note: int = 60, temperature=1.) -> np.ndarray:
     """
