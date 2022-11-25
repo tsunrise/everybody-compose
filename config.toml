@@ -57,7 +57,8 @@ clip_grad = 5.0
 
 [sampling.default]
 strategy = "greedy"
-init_note = 60
-top_p = 0.9
-repeat_decay = 0.9
-temperature = 1.0
+init_note = 65
+top_p = 0.8
+top_k = 3
+repeat_decay = 0.8
+temperature = 1.2

@@ -17,10 +17,11 @@ def get_distribution_generator(model, beats, device) -> DistributionGenerator:
     else:
         raise NotImplementedError("Sampling is not implemented for this model")
 
-def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, repeat_decay: float = 0.5, temperature = 1.) -> Tuple[int, float]:
+def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, top_k: int=4, repeat_decay: float = 0.5, temperature = 1.) -> Tuple[int, float]:
     """
     - `distribution`: a tensor of shape (n_notes, ), containing the conditional distribution of the next note
     - `top_p`: sample only the top p% of the distribution
+    - `top_k`: sample only the top k notes of the distribution
     - `repeat_decay`: penalty on repeating the same note. Each time the same note is repeated, the probability of repeating it is multiplied by `1 - repeat_decay`.
                       the probability of getting N repeats is upper bounded by `(1 - repeat_decay) ** N`
     - `temperature`: temperature of the distribution. Lower temperature gives more confidence to the most probable notes, higher temperature gives a more uniform distribution.
@@ -41,7 +42,7 @@ def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, 
     cumsum_prob = torch.cumsum(sorted_prob, dim=0)
     top_p_mask = cumsum_prob < top_p
     top_p_mask[0] = True
-    top_p_idx = sorted_idx[top_p_mask]
+    top_p_idx = sorted_idx[top_p_mask][:top_k]
     top_p_distribution = distribution[top_p_idx]
     # normalize the distribution
     top_p_distribution = top_p_distribution / top_p_distribution.sum()
@@ -52,12 +53,13 @@ def sample_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0.9, 
     conditional_likelihood = top_p_distribution[sampled_note].item()
     return top_p_idx[sampled_note].item(), conditional_likelihood
 
-def greedy_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, repeat_decay: float = 0.5, initial_note: int = 60, temperature=1.) -> np.ndarray:
+def greedy_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, top_k:int= 4, repeat_decay: float = 0.5, initial_note: int = 60, temperature=1.) -> np.ndarray:
     """
     - `model`: model to use for sampling
     - `seq_len`: the length of the sequence to be sampled
     - `device`: the device to use
     - `top_p`: sample only the top p% of the distribution
+    - `top_k`: sample only the top k notes of the distribution
     - `repeat_decay`: penalty on repeating the same note. Each time the same note is repeated, the probability of repeating it is multiplied by `1 - repeat_decay`.
                       the probability of getting N repeats is upper bounded by `(1 - repeat_decay) ** N`
     - `initial_note`: the initial note to use
@@ -74,7 +76,7 @@ def greedy_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, repe
         # get the distribution
         state, distribution = dist.proceed(state, prev_note, torch.tensor(generated_sequence, device=device))
         # sample
-        sampled_note, _ = sample_step(prev_note, distribution, top_p, repeat_decay, temperature)
+        sampled_note, _ = sample_step(prev_note, distribution, top_p, top_k, repeat_decay, temperature)
         generated_sequence.append(sampled_note)
         prev_note = sampled_note
     return np.array(generated_sequence)

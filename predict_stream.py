@@ -8,7 +8,6 @@ import torch
 import toml
 
 from utils.data_paths import DataPaths
-# from utils.beats_generator import create_beat
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
 from utils.sample import greedy_search
 
@@ -46,7 +45,7 @@ def predict_notes_sequence(durs_seq, model, device, profile):
     model.eval()
     with torch.no_grad():
         if profile["strategy"] == "greedy":
-            notes_seq = greedy_search(model, durs_seq, device, profile["top_p"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
+            notes_seq = greedy_search(model, durs_seq, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
         else:
             raise NotImplementedError("Strategy {} not implemented".format(profile["strategy"]))
     prev_rest_seq = durs_seq[:, 0] # (seq_length,)
@@ -81,6 +80,7 @@ if __name__ == '__main__':
 
     # sample one midi file
     if main_args.source == 'interactive':
+        from utils.beats_generator import create_beat
         X = create_beat()
         X[0][0] = 2.
         # convert to float32
