@@ -23,17 +23,18 @@ def convert_to_stream(notes, prev_rest, curr_durs):
     Convert two lists of notes and durations to a music21 stream
     """
     s = music21.stream.Stream()
+    # set tempo and signature so 1 sec equals 1 quarterLength in the setting
+    tempo = music21.tempo.MetronomeMark(number = 60)
+    s.append(tempo)
+    signature = music21.meter.TimeSignature('4/4')
+    s.append(signature)
     for n, r, d in zip(notes, prev_rest, curr_durs):
         if r:
             a = music21.note.Rest()
-            # TODO: quarterLength is not necessarily the same as duration
-            # quarterLength=1 is a whole note, quarterLength=0.25 is a quarter note
-            # each note takes 4 seconds when tempo=60
-            # we might also need to quantize this
-            a.duration.quarterLength = float(r * 2) # TODO: hack
+            a.duration.quarterLength = float(r)
             s.append(a)
         a = music21.note.Note(n)
-        a.duration.quarterLength = float(d * 2) # TODO: hack
+        a.duration.quarterLength = float(d)
         s.append(a)
     return s
 
