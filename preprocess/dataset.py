@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 from preprocess.constants import DATASETS_CONFIG_PATH
-from preprocess.prepare import download_midi_files, parse_midi_to_input_and_labels
+from preprocess.prepare import download_midi_files, parse_melody_to_beats_notes
 from preprocess.fetch import download
 
 import numpy as np
@@ -11,6 +11,8 @@ from tqdm import tqdm
 import csv
 from utils.data_paths import DataPaths
 from dataclasses import dataclass
+
+from utils.render import convert_to_melody
 
 PREPROCESS_SAVE_FREQ = 32
 
@@ -96,7 +98,7 @@ class BeatsRhythmsDataset(Dataset):
             with warnings.catch_warnings():
                 warnings.filterwarnings("error")
             try:
-                beats, notes = parse_midi_to_input_and_labels(io)
+                beats, notes = parse_melody_to_beats_notes(io)
                 self.beats_list.append(beats)
                 self.notes_list.append(notes) 
             except Warning:
@@ -190,8 +192,10 @@ class BeatsRhythmsDataset(Dataset):
         indices = indices[:max_len]
         return self.gather(indices)
 
-    def generate_midi(self, idx, path = "output.mid"):
-        raise NotImplementedError()
+    def to_stream(self, idx):
+        beats = self.beats_list[idx]
+        notes = self.notes_list[idx]
+        return convert_to_melody(beats, notes)
 
 
 # def collate_fn(batch):
