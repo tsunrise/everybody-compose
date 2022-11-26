@@ -72,6 +72,7 @@ def create_beat():
                 end_time.append(timestamp)
             num_pressed -= 1
     assert len(start_time) == len(end_time)
+    assert num_pressed == 0
     beat_sequence = convert_start_end_to_beats(np.array(start_time), np.array(end_time))
 
     paths = DataPaths()
