@@ -6,16 +6,8 @@ import torch
 import toml
 
 from utils.data_paths import DataPaths
-from utils.beats_generator import create_beat
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
-from utils.render import convert_to_melody
-
-
-def write_to_midi(music, filename):
-    """
-    Write music21 stream to midi file
-    """
-    music.write('mid', fp=filename)
+from utils.render import render_midi
 
 def predict_notes_sequence(beats, model, init_note, device, temperature):
     """
@@ -56,6 +48,7 @@ if __name__ == '__main__':
 
     # sample one midi file
     if main_args.source == 'interactive':
+        from utils.beats_generator import create_beat
         X = create_beat()
         X[0][0] = 2.
         # convert to float32
@@ -89,6 +82,5 @@ if __name__ == '__main__':
     )
 
     # convert stream to midi
-    stream = convert_to_melody(X, notes)
     midi_paths = paths.midi_outputs_dir / main_args.midi_filename
-    write_to_midi(stream, midi_paths)
+    render_midi(X, notes, midi_paths)

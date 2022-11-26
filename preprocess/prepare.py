@@ -2,9 +2,6 @@ from typing import IO, Iterable, Tuple
 import zipfile
 
 import numpy as np
-import note_seq.midi_io as midi_io
-import note_seq.melody_inference as melody_inference
-import time
 from preprocess.fetch import download
 
 def download_midi_files(dataset: str, midi_url: str):
@@ -45,6 +42,8 @@ def parse_midi_to_melody(midi_file: IO[bytes]):
     yield:
         Tuple[start_time, end_time, pitch].
     """
+    import note_seq.midi_io as midi_io
+    import note_seq.melody_inference as melody_inference
     ns = midi_io.midi_to_note_sequence(midi_file)
     with np.errstate(divide='ignore'):
         instrument_id = melody_inference.infer_melody_for_sequence(ns)
@@ -53,6 +52,25 @@ def parse_midi_to_melody(midi_file: IO[bytes]):
             if note.instrument == instrument_id:
                 yield note.start_time, note.end_time, note.pitch
     return _gen(), len(ns.notes)
+
+def convert_start_end_to_beats(start_time: np.ndarray, end_time: np.ndarray):
+    """
+    Convert start time and end time to beats.
+    Args:
+        start_time: array of shape (seq_length,)
+        end_time: array of shape (seq_length,)
+    Returns:
+        beats: array of shape (seq_length, 2), where the first column is the rest time before current note and the second column is the current duration
+    """
+    # get the rest time since last beat
+    prev_rest = np.zeros_like(start_time)
+    prev_rest[1:] = start_time[1:] - end_time[:-1]
+    prev_rest[0] = start_time[0]
+
+    # get the duration of the note
+    duration = end_time - start_time
+
+    return np.stack([prev_rest, duration], axis=1)
 
 def parse_melody_to_beats_notes(melody: Iterable[Tuple[float, float, int]]) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -79,16 +97,7 @@ def parse_melody_to_beats_notes(melody: Iterable[Tuple[float, float, int]]) -> T
     end_time = np.array(end_time)
     pitch = np.array(pitch)
 
-    # get the rest time since last beat
-    prev_rest = np.zeros_like(start_time)
-    prev_rest[1:] = start_time[1:] - end_time[:-1]
-    prev_rest[0] = start_time[0]
-
-    # get the duration of the note
-    duration = end_time - start_time
-
-    # get the input and labels
-    input = np.stack([prev_rest, duration], axis=1)
+    beats = convert_start_end_to_beats(start_time, end_time)
     labels = pitch.reshape(-1, 1)
 
-    return input, labels
+    return beats, labels

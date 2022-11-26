@@ -1,10 +1,11 @@
 # render to music21 stream
 import note_seq
+import note_seq.midi_io as midi_io
 import numpy as np
 import torch
 def convert_to_melody(beats, notes):
     """
-    Convert two lists of notes and durations to a music21 stream
+    Convert beats and notes to melody.
     - `beats`: array of shape (seq_length, 2), where the first column is the rest time before current note and the second column is the current duration
     - `notes`: array of shape (seq_length,)
     Returns: Melody Array
@@ -29,6 +30,27 @@ def convert_to_melody(beats, notes):
 
     return start_time, end_time, pitch
     
+def convert_to_note_seq(beats, notes):
+    """
+    Convert beats and notes to note_seq.
+    - `beats`: array of shape (seq_length, 2), where the first column is the rest time before current note and the second column is the current duration
+    - `notes`: array of shape (seq_length,)
+    Returns: note_seq
+    """
+    start_time, end_time, pitch = convert_to_melody(beats, notes)
+    seq = note_seq.NoteSequence()
+    seq.tempos.add().qpm = 120 # tempos is irrelevant here
+    seq.total_time = end_time[-1]
+    for i in range(len(start_time)):
+        seq.notes.add(start_time=start_time[i], end_time=end_time[i], pitch=pitch[i], velocity=80) # velocity is irrelevant here
+    return seq
 
-
-    return s
+def render_midi(beats, notes, midi_path):
+    """
+    Render beats and notes to MIDI file.
+    - `beats`: array of shape (seq_length, 2), where the first column is the rest time before current note and the second column is the current duration
+    - `notes`: array of shape (seq_length,)
+    - `midi_path`: path to save the MIDI file
+    """
+    seq = convert_to_note_seq(beats, notes)
+    midi_io.note_sequence_to_midi_file(seq, midi_path)
