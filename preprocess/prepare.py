@@ -44,7 +44,8 @@ def parse_midi_to_melody(midi_file: IO[bytes]):
     """
     import note_seq.midi_io as midi_io
     import note_seq.melody_inference as melody_inference
-    ns = midi_io.midi_to_note_sequence(midi_file)
+    melody_inference.MAX_NUM_FRAMES = 100000
+    ns = midi_io.midi_to_note_sequence(midi_file.read())
     with np.errstate(divide='ignore'):
         instrument_id = melody_inference.infer_melody_for_sequence(ns)
     def _gen():

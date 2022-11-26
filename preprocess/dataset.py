@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 from preprocess.constants import DATASETS_CONFIG_PATH
-from preprocess.prepare import download_midi_files, parse_melody_to_beats_notes
+from preprocess.prepare import download_midi_files, parse_melody_to_beats_notes, parse_midi_to_melody
 from preprocess.fetch import download
 
 import numpy as np
@@ -89,18 +89,18 @@ class BeatsRhythmsDataset(Dataset):
             skip = len(self.metadata_list)
             print(f"Resuming from {skip} files")
         bar = tqdm(total=num_files, desc = "Processing MIDI files")
-        warnings_cnt, errors_cnt = 0, 0
+        warnings_cnt, errors_cnt, saved = 0, 0, 0
         for filename, io in midi_files:
             if skip > 0:
                 skip -= 1
                 bar.update(1)
                 continue
+            beats, notes = None, None
             with warnings.catch_warnings():
                 warnings.filterwarnings("error")
             try:
-                beats, notes = parse_melody_to_beats_notes(io)
-                self.beats_list.append(beats)
-                self.notes_list.append(notes) 
+                melody, _ = parse_midi_to_melody(io)
+                beats, notes = parse_melody_to_beats_notes(melody)
             except Warning:
                 warnings_cnt += 1
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
@@ -113,13 +113,16 @@ class BeatsRhythmsDataset(Dataset):
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
             if "truncate" in config:
                 filename = filename[len(config["truncate"]):]
-            self.metadata_list.append(metadata[filename])
-            self.name_to_idx[filename] = len(self.metadata_list) - 1
+            if beats is not None and notes is not None:
+                self.beats_list.append(beats)
+                self.notes_list.append(notes) 
+                self.metadata_list.append(metadata[filename])
+                self.name_to_idx[filename] = len(self.metadata_list) - 1
             bar.update(1)
-            bar.set_postfix(warns=warnings_cnt, errors=errors_cnt)
             if len(self.metadata_list) % PREPROCESS_SAVE_FREQ == 0:
-                print(f"Saving progress to {progress_path}")
                 self.save_processed_to_file(progress_path)
+                saved = len(self.metadata_list)
+            bar.set_postfix(warns=warnings_cnt, errors=errors_cnt, saved=saved)
         bar.close()
 
 
