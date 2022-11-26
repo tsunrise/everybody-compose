@@ -12,8 +12,6 @@ import csv
 from utils.data_paths import DataPaths
 from dataclasses import dataclass
 
-from utils.render import convert_to_melody
-
 PREPROCESS_SAVE_FREQ = 32
 
 @dataclass
@@ -196,6 +194,7 @@ class BeatsRhythmsDataset(Dataset):
         return self.gather(indices)
 
     def to_stream(self, idx):
+        from utils.render import convert_to_melody
         beats = self.beats_list[idx]
         notes = self.notes_list[idx]
         return convert_to_melody(beats, notes)

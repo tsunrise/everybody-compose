@@ -1,5 +1,5 @@
 # render to music21 stream
-import note_seq
+from note_seq.protobuf.music_pb2 import NoteSequence
 import note_seq.midi_io as midi_io
 import numpy as np
 import torch
@@ -38,7 +38,7 @@ def convert_to_note_seq(beats, notes):
     Returns: note_seq
     """
     start_time, end_time, pitch = convert_to_melody(beats, notes)
-    seq = note_seq.NoteSequence()
+    seq = NoteSequence()
     seq.tempos.add().qpm = 120 # tempos is irrelevant here
     seq.total_time = end_time[-1]
     for i in range(len(start_time)):
