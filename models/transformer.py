@@ -48,7 +48,7 @@ class DeepBeatsTransformer(nn.Transformer):
                  src_vocab_size: int,
                  tgt_vocab_size: int,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+                 dropout: float = 0.0):
         super(DeepBeatsTransformer, self).__init__()
         self.transformer = Transformer(d_model=emb_size,
                                        nhead=nhead,
@@ -97,10 +97,12 @@ class DeepBeatsTransformer(nn.Transformer):
         Pred: (batch_size, seq_len, num_notes), logits
         Target: (batch_size, seq_len), range from 0 to num_notes-1
         """
+        target = target.transpose(1, 0)
         criterion = nn.CrossEntropyLoss()
-        loss = criterion(pred.reshape(-1, pred.shape[-1]), target.reshape(-1))
+        target_one_hot = torch.nn.functional.one_hot(target, self.num_notes).float()
+        loss = criterion(pred, target_one_hot)
         return loss
-    
+
     def clip_gradients_(self, max_value):
         torch.nn.utils.clip_grad.clip_grad_value_(self.parameters(), max_value)
 
@@ -134,7 +136,7 @@ class DeepBeatsTransformer(nn.Transformer):
 
             ys = torch.cat([ys,
                             torch.ones(1, 1).type_as(src.data).fill_(y_next)], dim=0)
-        ys = ys.squeeze(1).numpy()
+        ys = ys.cpu().squeeze(1).numpy()
         print(ys)
         return ys
 
