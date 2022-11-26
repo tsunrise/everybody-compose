@@ -22,17 +22,20 @@ def create_beat():
     ENTER_KEY = keyboard.Key.enter
 
     events = []
-    num_pressed = 0
+    pressing_key = None
     base_time = time.time()
     def on_press(key):
         '''
         listener that monitor presses of the space key
         record the previous rest time until the space key is pressed
         '''
-        nonlocal events, num_pressed
-        if key in TAP_KEYS:
-            events.append((Event.PRESS, time.time() - base_time))
-            num_pressed += 1
+        nonlocal events, pressing_key
+        if key in TAP_KEYS and key != pressing_key:
+            curr_time = time.time() - base_time
+            if pressing_key is not None:
+                events.append((Event.RELEASE, curr_time))
+            events.append((Event.PRESS, curr_time))
+            pressing_key = key
 
     def on_release(key):
         '''
@@ -40,16 +43,16 @@ def create_beat():
         record the pressed time on the space key
         stop the listener when the enter key is released
         '''
-        nonlocal events, num_pressed
+        nonlocal events, pressing_key
         if key == ENTER_KEY:
             # Stop listener
             curr_time = time.time() - base_time
-            for _ in range(num_pressed):
+            if pressing_key is not None:
                 events.append((Event.RELEASE, curr_time))
             return False
-        elif key in TAP_KEYS:
+        elif key in TAP_KEYS and key == pressing_key:
             events.append((Event.RELEASE, time.time() - base_time))
-            num_pressed -= 1
+            pressing_key = None
 
 
     print("use z,x,space key on keyboard to create a sequence of beat")
@@ -73,6 +76,8 @@ def create_beat():
             num_pressed -= 1
     assert len(start_time) == len(end_time)
     assert num_pressed == 0
+    # print("start_time: ", start_time)
+    # print("end_time: ", end_time)
     beat_sequence = convert_start_end_to_beats(np.array(start_time), np.array(end_time))
 
     paths = DataPaths()
