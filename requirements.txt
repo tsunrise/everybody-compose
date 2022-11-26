@@ -8,4 +8,5 @@ toml
 tqdm
 pynput
 tensorboard
-note_seq
+note_seq==0.0.5
+protobuf==4.21.2

@@ -54,6 +54,19 @@ Go to project directory:
 Make sure code is up-to-date:
 `git pull`
 
+Set up environment variables:
+On Ubuntu:
+
+```sh
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+```
+
+On Windows:
+
+```powershell
+$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION="python"
+```
+
 Run training command:
 `python main.py --n_files 10`
 
