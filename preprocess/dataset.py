@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 from preprocess.constants import DATASETS_CONFIG_PATH
-from preprocess.prepare import download_midi_files, parse_midi_to_input_and_labels
+from preprocess.prepare import download_midi_files, parse_melody_to_beats_notes, parse_midi_to_melody
+
 from preprocess.fetch import download
 
 import numpy as np
@@ -22,7 +23,7 @@ class MetaData:
     midi_filename: str
 
 def _processed_name(dataset: str, dataset_type:str):
-    return f"processed_{dataset}_{dataset_type}.pkl"
+    return f"processed_{dataset}_{dataset_type}_v2.pkl"
 
 class BeatsRhythmsDataset(Dataset):
     def __init__(self, seq_len, seed = 12345, initial_note: int = 60):
@@ -57,7 +58,7 @@ class BeatsRhythmsDataset(Dataset):
         ### Remotely processed data
         config = toml.load(DATASETS_CONFIG_PATH)["datasets"][dataset_type][dataset]
         if "processed" in config and not force_prepare:
-            prepared = download(f"processed_{dataset}_{dataset_type}.pkl", config["processed"])
+            prepared = download(_processed_name(dataset, dataset_type), config["processed"])
             if prepared is None:
                 raise ValueError("Failed to download prepared dataset")
             with open(prepared, "rb") as f:
@@ -87,18 +88,18 @@ class BeatsRhythmsDataset(Dataset):
             skip = len(self.metadata_list)
             print(f"Resuming from {skip} files")
         bar = tqdm(total=num_files, desc = "Processing MIDI files")
-        warnings_cnt, errors_cnt = 0, 0
+        warnings_cnt, errors_cnt, saved = 0, 0, 0
         for filename, io in midi_files:
             if skip > 0:
                 skip -= 1
                 bar.update(1)
                 continue
+            beats, notes = None, None
             with warnings.catch_warnings():
                 warnings.filterwarnings("error")
             try:
-                beats, notes = parse_midi_to_input_and_labels(io)
-                self.beats_list.append(beats)
-                self.notes_list.append(notes) 
+                melody, _ = parse_midi_to_melody(io)
+                beats, notes = parse_melody_to_beats_notes(melody)
             except Warning:
                 warnings_cnt += 1
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
@@ -111,13 +112,16 @@ class BeatsRhythmsDataset(Dataset):
                 bar.set_description(f"Parsing MIDI files ({warnings_cnt} warns, {errors_cnt} errors)", refresh=True)
             if "truncate" in config:
                 filename = filename[len(config["truncate"]):]
-            self.metadata_list.append(metadata[filename])
-            self.name_to_idx[filename] = len(self.metadata_list) - 1
+            if beats is not None and notes is not None:
+                self.beats_list.append(beats)
+                self.notes_list.append(notes) 
+                self.metadata_list.append(metadata[filename])
+                self.name_to_idx[filename] = len(self.metadata_list) - 1
             bar.update(1)
-            bar.set_postfix(warns=warnings_cnt, errors=errors_cnt)
             if len(self.metadata_list) % PREPROCESS_SAVE_FREQ == 0:
-                print(f"Saving progress to {progress_path}")
                 self.save_processed_to_file(progress_path)
+                saved = len(self.metadata_list)
+            bar.set_postfix(warns=warnings_cnt, errors=errors_cnt, saved=saved)
         bar.close()
 
 
@@ -174,6 +178,13 @@ class BeatsRhythmsDataset(Dataset):
         dataset.name_to_idx = {v.midi_filename: i for i, v in enumerate(dataset.metadata_list)}
         return dataset
 
+    def subset_remove_short(self):
+        """
+        Remove short sequences from the dataset
+        """
+        indices = [i for i in range(len(self)) if len(self.beats_list[i]) >= self.seq_len]
+        return self.gather(indices)
+    
     def train_val_split(self, seed=0, val_ratio=0.1):
         rng = np.random.default_rng(seed)
         indices = np.arange(len(self.metadata_list))
@@ -190,8 +201,16 @@ class BeatsRhythmsDataset(Dataset):
         indices = indices[:max_len]
         return self.gather(indices)
 
-    def generate_midi(self, idx, path = "output.mid"):
-        raise NotImplementedError()
+    def to_stream(self, idx):
+        from utils.render import convert_to_note_seq
+        beats = self.beats_list[idx]
+        notes = self.notes_list[idx]
+        return convert_to_note_seq(beats, notes)
+
+    def to_midi(self, idx, midi_path):
+        from note_seq.midi_io import note_sequence_to_midi_file
+        stream = self.to_stream(idx)
+        note_sequence_to_midi_file(stream, midi_path)
 
 
 # def collate_fn(batch):

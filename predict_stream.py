@@ -1,57 +1,25 @@
 import argparse
 
-import music21
 import numpy as np
-from models.lstm import DeepBeatsLSTM
 import preprocess.dataset
 import torch
 import toml
 
 from utils.data_paths import DataPaths
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
-from utils.sample import greedy_search
+from utils.render import render_midi
 
-
-def write_to_midi(music, filename):
-    """
-    Write music21 stream to midi file
-    """
-    music.write('mid', fp=filename)
-
-def convert_to_stream(notes, prev_rest, curr_durs):
-    """
-    Convert two lists of notes and durations to a music21 stream
-    """
-    s = music21.stream.Stream()
-    for n, r, d in zip(notes, prev_rest, curr_durs):
-        if r:
-            a = music21.note.Rest()
-            # TODO: quarterLength is not necessarily the same as duration
-            # quarterLength=1 is a whole note, quarterLength=0.25 is a quarter note
-            # each note takes 4 seconds when tempo=60
-            # we might also need to quantize this
-            a.duration.quarterLength = float(r * 2) # TODO: hack
-            s.append(a)
-        a = music21.note.Note(n)
-        a.duration.quarterLength = float(d * 2) # TODO: hack
-        s.append(a)
-    return s
-
-def predict_notes_sequence(durs_seq, model, device, profile):
+def predict_notes_sequence(beats, model, init_note, device, temperature):
     """
     Predict notes sequence given durations sequence
     """
     model.to(device)
     model.eval()
+    beats = torch.from_numpy(beats).to(device)
+    init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
     with torch.no_grad():
-        if profile["strategy"] == "greedy":
-            notes_seq = greedy_search(model, durs_seq, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
-        else:
-            raise NotImplementedError("Strategy {} not implemented".format(profile["strategy"]))
-    prev_rest_seq = durs_seq[:, 0] # (seq_length,)
-    curr_durs_seq = durs_seq[:, 1] # (seq_length,)
-    print(notes_seq)
-    return notes_seq, prev_rest_seq, curr_durs_seq
+        notes_seq = model.sample(beats, init_note_t, temperature)
+    return notes_seq
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
@@ -59,9 +27,9 @@ if __name__ == '__main__':
     parser.add_argument('-c','--checkpoint_path', type=str)
     parser.add_argument('-o','--midi_filename', type=str, default="output.mid")
     parser.add_argument('-d','--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('-s','--source', type=str, default="interactive", help="interactive, dataset, or path to recorded beats")
-    parser.add_argument('--take', type=int, default=256, help="for dataset only: number of beats to take from dataset")
-    parser.add_argument('-p','--profile', type=str, default="default", help="sampling profile name in config.toml")
+    parser.add_argument('-s','--source', type=str, default="interactive")
+    parser.add_argument('-i','--init_note', type=int, default=60)
+    parser.add_argument('-t','--temperature', type=float, default=1)
 
     main_args = parser.parse_args()
     model_name = main_args.model_name
@@ -87,9 +55,9 @@ if __name__ == '__main__':
         X = np.array(X, dtype=np.float32) 
     elif main_args.source == 'dataset':
         dataset = preprocess.dataset.BeatsRhythmsDataset(64) # not used
-        dataset.load(global_config["dataset"])
+        dataset.load(global_config['dataset'])
         idx = np.random.randint(0, len(dataset))
-        X = dataset.beats_list[idx][:beats_to_take]
+        X = dataset.beats_list[idx][:64]
     else:
         with open(main_args.source, 'rb') as f:
             X = np.load(f, allow_pickle=True)
@@ -104,14 +72,13 @@ if __name__ == '__main__':
     print(model)
 
     # generate notes seq given durs seq
-    notes, prev_rest, curr_durs = predict_notes_sequence(
-        durs_seq = X.copy(), # select the first durs seq for now, batch size = 1
+    notes = predict_notes_sequence(
+        beats = X.copy(), # select the first durs seq for now, batch size = 1
         model=model,
         device=device,
         profile=config["sampling"][profile]
     )
 
     # convert stream to midi
-    stream = convert_to_stream(notes, prev_rest, curr_durs)
     midi_paths = paths.midi_outputs_dir / main_args.midi_filename
-    write_to_midi(stream, midi_paths)
+    render_midi(X, notes, midi_paths)
