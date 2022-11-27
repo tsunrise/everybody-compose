@@ -77,10 +77,13 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
 
     dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
     dataset.load(global_config["dataset"])
+    dataset = dataset.subset_remove_short()
     if n_files > 0:
         dataset = dataset.subset(n_files)
 
     training_data, val_data = dataset.train_val_split(global_config["train_val_split_seed"], global_config["val_ratio"])
+    print(f"Training data: {len(training_data)}")
+    print(f"Validation data: {len(val_data)}")
 
     train_loader = torch.utils.data.DataLoader(training_data, batch_size=model_config["batch_size"], shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=model_config["batch_size"], shuffle=False)

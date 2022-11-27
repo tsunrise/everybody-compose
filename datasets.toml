@@ -2,6 +2,6 @@
 midi = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
 metadata = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0.csv"
 truncate = "maestro-v3.0.0/"
-processed = "https://r2.tomshen.io/cs230/processed_mastero_mono.pkl"
+processed = "https://r2.tomshen.io/cs230/processed_mastero_mono_v2.pkl"
 
 [datasets.chords]

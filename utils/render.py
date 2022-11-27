@@ -19,7 +19,7 @@ def convert_to_melody(beats, notes):
         notes = notes.cpu().numpy()
     
     num_notes = beats.shape[0]
-
+    notes = notes.reshape(-1)
     # get the start time of each note
     start_time = np.zeros(num_notes)
     start_time[1:] = np.cumsum(np.sum(beats[:num_notes-1, :], axis=1))

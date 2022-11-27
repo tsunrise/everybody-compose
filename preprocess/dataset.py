@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 from preprocess.constants import DATASETS_CONFIG_PATH
 from preprocess.prepare import download_midi_files, parse_melody_to_beats_notes, parse_midi_to_melody
+
 from preprocess.fetch import download
 
 import numpy as np
@@ -177,6 +178,13 @@ class BeatsRhythmsDataset(Dataset):
         dataset.name_to_idx = {v.midi_filename: i for i, v in enumerate(dataset.metadata_list)}
         return dataset
 
+    def subset_remove_short(self):
+        """
+        Remove short sequences from the dataset
+        """
+        indices = [i for i in range(len(self)) if len(self.beats_list[i]) >= self.seq_len]
+        return self.gather(indices)
+    
     def train_val_split(self, seed=0, val_ratio=0.1):
         rng = np.random.default_rng(seed)
         indices = np.arange(len(self.metadata_list))
@@ -194,10 +202,15 @@ class BeatsRhythmsDataset(Dataset):
         return self.gather(indices)
 
     def to_stream(self, idx):
-        from utils.render import convert_to_melody
+        from utils.render import convert_to_note_seq
         beats = self.beats_list[idx]
         notes = self.notes_list[idx]
-        return convert_to_melody(beats, notes)
+        return convert_to_note_seq(beats, notes)
+
+    def to_midi(self, idx, midi_path):
+        from note_seq.midi_io import note_sequence_to_midi_file
+        stream = self.to_stream(idx)
+        note_sequence_to_midi_file(stream, midi_path)
 
 
 # def collate_fn(batch):

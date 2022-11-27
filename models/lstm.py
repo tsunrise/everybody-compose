@@ -17,6 +17,7 @@ class DeepBeatsLSTM(nn.Module):
         self.layer1 = nn.LSTM(embed_size + 2, hidden_dim, batch_first=True)
         self.layer2 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
         self.notes_logits_output = nn.Linear(hidden_dim, num_notes)
+        self.dropout = nn.Dropout(0.5)
         self.num_notes = num_notes
         self.hidden_dim = hidden_dim
 
@@ -53,6 +54,7 @@ class DeepBeatsLSTM(nn.Module):
         X = X_fc + X
 
         X, (h1, c1) = self.layer1(X, (h1_0, c1_0))
+        X = self.dropout(X)
         X, (h2, c2) = self.layer2(X, (h2_0, c2_0))
         predicted_notes = self.notes_logits_output(X)
         return predicted_notes, (h1, c1, h2, c2)
@@ -77,7 +79,7 @@ class DeepBeatsLSTM(nn.Module):
             scores = torch.nn.functional.softmax(scores, dim=1)
 
             y_next = None
-            while y_next is None or y_next == ys[-1]:
+            while y_next is None:
                 top10 = torch.topk(scores, 3, dim=1)
                 indices, probs = top10.indices, top10.values
                 probs = probs / torch.sum(probs)

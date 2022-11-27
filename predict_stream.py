@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('-s','--source', type=str, default="interactive")
     parser.add_argument('-i','--init_note', type=int, default=60)
-    parser.add_argument('-t','--temperature', type=float, default=0.5)
+    parser.add_argument('-t','--temperature', type=float, default=1)
 
     main_args = parser.parse_args()
     model_name = main_args.model_name
