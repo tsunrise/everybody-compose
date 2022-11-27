@@ -58,13 +58,14 @@ Set up environment variables:
 On Ubuntu:
 
 ```sh
-export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+chmod +x setup_env.sh # you only need to do this once
+./setup_env.sh
 ```
 
 On Windows:
 
 ```powershell
-$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION="python"
+./setup_env.ps1
 ```
 
 Run training command:
