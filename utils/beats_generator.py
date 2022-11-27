@@ -5,6 +5,7 @@ import time
 from utils.data_paths import DataPaths
 from preprocess.prepare import convert_start_end_to_beats
 from enum import Enum
+from sys import platform
 
 class Event(Enum):
     PRESS = 1
@@ -57,7 +58,8 @@ def create_beat():
 
     print("use z,x,space key on keyboard to create a sequence of beat")
     print("hit enter to stop")
-    with keyboard.Listener(on_press=on_press, on_release=on_release, suppress=True) as listener:
+    suppress = True if platform == "win32" else False
+    with keyboard.Listener(on_press=on_press, on_release=on_release, suppress=suppress) as listener:
         listener.join()
 
     # convert events to start_time and end_time
