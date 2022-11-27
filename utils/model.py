@@ -9,12 +9,16 @@ import datetime
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from utils.data_paths import DataPaths
-
+import models.lstm_local_attn as lstm_local_attn
 CONFIG_PATH = "./config.toml"
 
 def get_model(name, config, device):
     if name == "lstm":
         return lstm.DeepBeatsLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
+    elif name == "lstm_attn":
+        return lstm_local_attn.DeepBeatsLSTMLocalAttn(num_notes=config["n_notes"],
+         note_embed_size=config["embed_dim"], duration_fc_dim=config["duration_fc_dim"],
+         context_dim=config["context_dim"], hidden_dim=config["hidden_dim"]).to(device)
     elif name == "vanilla_rnn":
         return vanilla_rnn.DeepBeatsVanillaRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "attention_rnn":
@@ -42,6 +46,8 @@ def model_forward(model_name, model, input_seq: torch.Tensor, target_seq: torch.
         src_mask, tgt_mask = src_mask.to(device), tgt_mask.to(device)
         src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
         output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+    elif model_name == "lstm_attn":
+        output = model(input_seq, target_prev_seq)
     else:
         output, _ = model(input_seq, target_prev_seq)
     return output
