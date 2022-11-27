@@ -54,6 +54,20 @@ Go to project directory:
 Make sure code is up-to-date:
 `git pull`
 
+Set up environment variables:
+On Ubuntu:
+
+```sh
+chmod +x setup_env.sh # you only need to do this once
+./setup_env.sh
+```
+
+On Windows:
+
+```powershell
+./setup_env.ps1
+```
+
 Run training command:
 `python main.py --n_files 10`
 

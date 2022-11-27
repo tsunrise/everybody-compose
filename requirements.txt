@@ -4,8 +4,9 @@ numpy
 scipy
 torch
 matplotlib
-music21
 toml
 tqdm
 pynput
 tensorboard
+note_seq==0.0.5
+protobuf==4.21.2
