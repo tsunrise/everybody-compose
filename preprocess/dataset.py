@@ -23,7 +23,7 @@ class MetaData:
     midi_filename: str
 
 def _processed_name(dataset: str, dataset_type:str):
-    return f"processed_{dataset}_{dataset_type}.pkl"
+    return f"processed_{dataset}_{dataset_type}_v2.pkl"
 
 class BeatsRhythmsDataset(Dataset):
     def __init__(self, seq_len, seed = 12345, initial_note: int = 60):
@@ -58,7 +58,7 @@ class BeatsRhythmsDataset(Dataset):
         ### Remotely processed data
         config = toml.load(DATASETS_CONFIG_PATH)["datasets"][dataset_type][dataset]
         if "processed" in config and not force_prepare:
-            prepared = download(f"processed_{dataset}_{dataset_type}.pkl", config["processed"])
+            prepared = download(_processed_name(dataset, dataset_type), config["processed"])
             if prepared is None:
                 raise ValueError("Failed to download prepared dataset")
             with open(prepared, "rb") as f:
