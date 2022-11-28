@@ -8,6 +8,7 @@ import toml
 from utils.data_paths import DataPaths
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
 from utils.render import render_midi
+from utils.sample import stochastic_search
 
 def predict_notes_sequence(beats, model, init_note, device, temperature):
     """
@@ -28,8 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-o','--midi_filename', type=str, default="output.mid")
     parser.add_argument('-d','--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('-s','--source', type=str, default="interactive")
-    parser.add_argument('-i','--init_note', type=int, default=60)
-    parser.add_argument('-t','--temperature', type=float, default=1)
+    parser.add_argument('-t','--profile', type=str, default="default")
 
     main_args = parser.parse_args()
     model_name = main_args.model_name
@@ -37,12 +37,11 @@ if __name__ == '__main__':
     midi_filename = main_args.midi_filename
     device = main_args.device
     source = main_args.source
-    init_note = main_args.init_note
-    temperature = main_args.temperature
+    profile = main_args.profile
 
     config = toml.load(CONFIG_PATH)
     global_config = config['global']
-    model_config = config[main_args.model_name]
+    model_config = config["model"][main_args.model_name]
 
     paths = DataPaths()
 
@@ -67,20 +66,14 @@ if __name__ == '__main__':
     # load model
 
     model = get_model(main_args.model_name, model_config, main_args.device)
-
     model.eval()
     load_checkpoint(checkpoint_path, model, device)
     print(model)
 
     # generate notes seq given durs seq
-    notes = predict_notes_sequence(
-        beats = X.copy(), # select the first durs seq for now, batch size = 1
-        model=model,
-        init_note=main_args.init_note,
-        device=device,
-        temperature=main_args.temperature
-    )
-
+    profile = config["sampling"][profile]
+    notes = stochastic_search(model, X, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
+    print(notes)
     # convert stream to midi
     midi_paths = paths.midi_outputs_dir / main_args.midi_filename
     render_midi(X, notes, midi_paths)
