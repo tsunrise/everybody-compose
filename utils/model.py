@@ -16,9 +16,8 @@ def get_model(name, config, device):
     if name == "lstm":
         return lstm.DeepBeatsLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "lstm_attn":
-        return lstm_local_attn.DeepBeatsLSTMLocalAttn(num_notes=config["n_notes"],
-         note_embed_size=config["embed_dim"], duration_fc_dim=config["duration_fc_dim"],
-         context_dim=config["context_dim"], hidden_dim=config["hidden_dim"]).to(device)
+        return lstm_local_attn.DeepBeatsLSTMLocalAttn(num_notes=config["n_notes"], hidden_dim=config["hidden_dim"],
+         dropout_p=config["dropout_p"]).to(device)
     elif name == "vanilla_rnn":
         return vanilla_rnn.DeepBeatsVanillaRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "attention_rnn":

@@ -1,23 +1,20 @@
 import torch
 from torch import nn
-
+from torch.nn import functional as F
 
 class LocalAttnEncoder(nn.Module):
     """
     Local attention encoder.
     """
-    def __init__(self, duration_fc_dim, hidden_dim, context_dim):
+    def __init__(self, hidden_dim):
         """
         - `duration_fc_dim`: dimension of the fully connected layer for duration
         - `hidden_dim`: dimension of the hidden state of both encoder and decoder
         - `context_dim`: dimension of the context vector
         """
         super(LocalAttnEncoder, self).__init__()
-        self.duration_fc = nn.Linear(2, duration_fc_dim)
-        self.duration_activation = nn.LeakyReLU()
-        self.encoder = nn.LSTM(duration_fc_dim, hidden_dim, batch_first=True, bidirectional = True)
-        self.context_fc = nn.Linear(hidden_dim * 2, context_dim)
-        self.context_activation = nn.LeakyReLU()
+        self.duration_fc = nn.Linear(2, hidden_dim)
+        self.encoder = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, bidirectional = True)
 
     def forward(self, x):
         """
@@ -27,17 +24,14 @@ class LocalAttnEncoder(nn.Module):
         - `encoder_state`: encoder state, shape: (1, hidden_dim). The state only includes left-to-right direction.
         """
         x = self.duration_fc(x)
-        x = self.duration_activation(x)
         x, encoder_state = self.encoder(x)
-        x = self.context_fc(x)
-        x = self.context_activation(x)
         return x, (encoder_state[0][:1], encoder_state[1][:1])
 
 class LocalAttnDecoder(nn.Module):
     """
     Local Attention Decoder.
     """
-    def __init__(self, note_embed_size, context_dim, hidden_dim, num_notes):
+    def __init__(self, hidden_dim, num_notes, dropout_p = 0.1):
         """
         - `note_embed_size`: embedding size of notes
         - `context_dim`: dimension of the context vector
@@ -45,8 +39,10 @@ class LocalAttnDecoder(nn.Module):
         - `num_notes`: number of notes 
         """
         super(LocalAttnDecoder, self).__init__()
-        self.note_embed = nn.Embedding(num_notes, note_embed_size)
-        self.rnn = nn.LSTM(note_embed_size + context_dim, hidden_dim, batch_first=True)
+        self.note_embed = nn.Embedding(num_notes, hidden_dim)
+        self.combine_fc = nn.Linear(hidden_dim * 3, hidden_dim)
+        self.dropout = nn.Dropout(dropout_p)
+        self.rnn = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
         self.notes_output = nn.Linear(hidden_dim, num_notes)
 
     def forward(self, tgt, context, encoder_state):
@@ -60,7 +56,10 @@ class LocalAttnDecoder(nn.Module):
                     output[i] is the probability distribution of notes at time step i
         """
         tgt = self.note_embed(tgt)
+        tgt = self.dropout(tgt)
         tgt = torch.cat((tgt, context), dim=2)
+        tgt = self.combine_fc(tgt)
+        tgt = F.relu(tgt)
         # print(f"{encoder_state[0].shape=}")
         tgt, _ = self.rnn(tgt, encoder_state)
         tgt = self.notes_output(tgt)
@@ -73,17 +72,16 @@ class DeepBeatsLSTMLocalAttn(nn.Module):
     i-th decoder block only uses i-th encoder block's output as context vector.
     This can improve the performance of the model, from quadratic to linear.
     """
-    def __init__(self, num_notes, note_embed_size, duration_fc_dim, context_dim, hidden_dim):
+    def __init__(self, num_notes, hidden_dim, dropout_p = 0.1):
         """
         - `num_notes`: number of notes 
-        - `note_embed_size`: embedding size of notes
         - `duration_fc_dim`: dimension of the fully connected layer for duration
         - `context_dim`: dimension of the context vector
         - `hidden_dim`: dimension of the hidden state of both encoder and decoder
         """
         super(DeepBeatsLSTMLocalAttn, self).__init__()
-        self.encoder = LocalAttnEncoder(duration_fc_dim, hidden_dim, context_dim)
-        self.decoder = LocalAttnDecoder(note_embed_size, context_dim, hidden_dim, num_notes)
+        self.encoder = LocalAttnEncoder(hidden_dim)
+        self.decoder = LocalAttnDecoder(hidden_dim, num_notes, dropout_p)
         self.num_notes = num_notes
     
     def forward(self, x, tgt):
