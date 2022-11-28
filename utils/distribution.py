@@ -81,4 +81,5 @@ class TransformerDistribution(DistributionGenerator):
         out = out.transpose(0, 1)
         scores = self.model.generator(out[:, -1]) # 1 * num_notes, we only care about the last one
         scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.transpose(0, 1).squeeze(1)
         return {"ys": torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)}, scores
