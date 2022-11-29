@@ -65,7 +65,7 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         self.device = device
         self.x = x
         self.context, self.encoder_state = self.model.encoder(x)
-        self.starter = [60, 62, 64] # TODO: apply the same trick to all cases
+        self.starter = [60, 67, 65] # TODO: apply the same trick to all cases
 
     def initial_state(self) -> dict:
         super().initial_state()
