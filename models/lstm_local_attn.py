@@ -45,12 +45,12 @@ class LocalAttnDecoder(nn.Module):
         self.rnn = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
         self.notes_output = nn.Linear(hidden_dim, num_notes)
 
-    def forward(self, tgt, context, encoder_state):
+    def forward(self, tgt, context, memory = None):
         """
         - `tgt`: target sequence, shape: (seq_len, 1)
            tgt[i] is the (i-1)-th note in the sequence
         - `context`: context vector, shape: (seq_len, context_dim)
-        - `encoder_state`: encoder state, shape: (1, hidden_dim)
+        - `memory`: encoder state or intermediate state, shape: (1, hidden_dim)
         Returns:
         - `output`: output sequence, shape: (seq_len, num_notes)
                     output[i] is the probability distribution of notes at time step i
@@ -60,8 +60,7 @@ class LocalAttnDecoder(nn.Module):
         tgt = self.combine_fc(tgt)
         tgt = F.relu(tgt)
         tgt = self.dropout(tgt)
-
-        tgt, _ = self.rnn(tgt, encoder_state)
+        tgt, _ = self.rnn(tgt, memory)
         tgt = self.notes_output(tgt)
         return tgt
     
