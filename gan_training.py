@@ -1,55 +1,42 @@
 import argparse
-import os
 import datetime
+import toml
 
-import numpy as np
+from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
-from models.lstm import DeepBeatsLSTM
 from models.cnn_discriminator import CNNDiscriminator
 
-import utils.devices as devices
-from preprocess.constants import ADL_PIANO_TOTAL_SIZE
-from preprocess.dataset import BeatsRhythmsDataset, collate_fn
+from preprocess.dataset import BeatsRhythmsDataset
 from utils.data_paths import DataPaths
+from utils.model import get_model, load_checkpoint, save_checkpoint, model_forward
 
 '''
     Code adapted from https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
 '''
+CONFIG_PATH = "./config.toml"
 
-def model_file_name(model_name, n_files, n_epochs):
-    return "{}_{}_{}.pth".format(model_name, "all" if n_files == -1 else n_files, n_epochs)
-
-def save_model(model, paths, model_name, n_files, n_epochs):
-    model_file = model_file_name(model_name, n_files, n_epochs)
-    model_path = paths.snapshots_dir / model_file
-    torch.save(model.state_dict(), model_path)
-    print(f'Model Saved at {model_path}')
-
-def train(args):
+def train(generator_name: str, discriminator_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots_freq:int=10, generator_checkpoint: Optional[str] = None, discriminator_checkpoint: Optional[str] = None):
     # check cuda status
-    devices.status_check()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    paths = DataPaths()
     print(f"Using {device} device")
 
     # initialize model
-    netG = DeepBeatsLSTM(args.n_notes, args.embed_dim, args.hidden_dim).to(device)
+    config = toml.load(CONFIG_PATH)
+    global_config = config["global"]
+    netG_config = config[generator_name]
+    netG = get_model(generator_name, netG_config, device)
     print(netG)
-    netD = CNNDiscriminator(args.n_notes, args.seq_len, args.embed_dim).to(device)
+    netD_config = config[discriminator_name]
+    netD = CNNDiscriminator(netG_config["n_notes"], netG_config["seq_len"], netD_config["embed_dim"]).to(device)
     print(netD)
 
-    if args.load_checkpoint_G:
-        filename = paths.snapshots_dir / args.load_checkpoint_G
-        netG.load_state_dict(torch.load(filename))
-        print(f'Generator Checkpoint loaded {filename}')
-    if args.load_checkpoint_D:
-        filename = paths.snapshots_dir / args.load_checkpoint_D
-        netD.load_state_dict(torch.load(filename))
-        print(f'Discriminator Checkpoint loaded {filename}')
+    if generator_checkpoint:
+        load_checkpoint(generator_checkpoint, netG, device)
+    if discriminator_checkpoint:
+        load_checkpoint(discriminator_checkpoint, netD, device)
 
     # Establish convention for real and fake labels during training
     real_label = 1.
@@ -57,44 +44,45 @@ def train(args):
     criterion = nn.BCELoss()
 
     # define optimizer
-    optimizerD = torch.optim.Adam(netD.parameters(), lr=args.learning_rate)
-    optimizerG = torch.optim.Adam(netG.parameters(), lr=args.learning_rate)
+    optimizerD = torch.optim.Adam(netD.parameters(), lr=netG_config["lr"])
+    optimizerG = torch.optim.Adam(netG.parameters(), lr=netD_config["lr"])
 
     # prepare training/validation loader
-    indices = np.arange(args.n_files if args.n_files != -1 else ADL_PIANO_TOTAL_SIZE)
-    np.random.seed(0)
-    np.random.shuffle(indices)
-    train_size = len(indices)
-    train_indices = indices[: train_size]
-    train_dataset = BeatsRhythmsDataset(mono=True, num_files=args.n_files, seq_len=args.seq_len, save_freq=128,
-                                        max_files_to_parse=args.max_files_to_parse, indices=train_indices)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=0,
-                                               collate_fn=collate_fn)
+    dataset = BeatsRhythmsDataset(netG_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
+    dataset.load(global_config["dataset"])
+    dataset = dataset.subset_remove_short()
+    if n_files > 0:
+        dataset = dataset.subset(n_files)
+
+    training_data, val_data = dataset.train_val_split(global_config["train_val_split_seed"], 0)
+    print(f"Training data: {len(training_data)}")
+
+    train_loader = torch.utils.data.DataLoader(training_data, netG_config["batch_size"], shuffle=True)
 
     # define tensorboard writer
+    paths = DataPaths()
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-    log_dir = paths.tensorboard_dir / "{}_{}/{}".format("GAN", "all" if args.n_files == -1 else args.n_files,
+    log_dir = paths.tensorboard_dir / "{}_{}/{}".format("GAN", "all" if n_files == -1 else n_files,
                                                         current_time)
     writer = SummaryWriter(log_dir=log_dir, flush_secs=60)
 
     # training loop
     netD.train()
     netG.train()
-    for epoch in range(args.n_epochs):
+    for epoch in range(n_epochs):
         num_train_batches = 0
-        for X, y, y_prev in train_loader:
+        for batch in train_loader:
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
             ## Train with all-real batch
             netD.zero_grad()
-            label = torch.full((X.shape[0], 1), real_label, dtype=torch.float, device=device)
-            input_seq = torch.from_numpy(X.astype(np.float32)).to(device)
-            target_seq = torch.from_numpy(y).long().to(device)
-            target_prev_seq = torch.from_numpy(y_prev).long().to(device)
-
+            input_seq = batch["beats"].to(device)
+            target_seq = batch["notes"].long().to(device)
+            target_prev_seq = batch["notes_shifted"].long().to(device)
+            label = torch.full((input_seq.shape[0], 1), real_label, dtype=torch.float, device=device)
             # Forward pass real batch through D
-            target_one_hot = torch.nn.functional.one_hot(target_seq, args.n_notes).float()
+            target_one_hot = torch.nn.functional.one_hot(target_seq, netG_config['n_notes']).float()
             output = netD(input_seq, target_one_hot)
             # Calculate loss on all-real batch
             errD_real = criterion(output, label)
@@ -104,8 +92,10 @@ def train(args):
 
             ## Train with all-fake batch
             # Generate fake image batch with G
-            fake_logits, _ = netG(input_seq, target_prev_seq)
-            fake = F.gumbel_softmax(fake_logits, tau = args.temperature)
+            fake_logits = model_forward(generator_name, netG, input_seq, target_seq, target_prev_seq, device)
+            fake = F.gumbel_softmax(fake_logits)
+            if generator_name == "transformer":
+                fake = fake.transpose(0,1)
             label.fill_(fake_label)
             # Classify all fake batch with D
             output = netD(input_seq, fake.detach())
@@ -139,39 +129,31 @@ def train(args):
 
         # Output training stats
         print('[%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
-              % (epoch, args.n_epochs, errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+              % (epoch, n_epochs, errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
 
         writer.add_scalar("Generator loss", errG.item(), epoch)
         writer.add_scalar("Discriminator loss", errD.item(), epoch)
 
-        if (epoch + 1) % args.snapshots_freq == 0:
-            save_model(netG, paths, args.generator_name, args.n_files, epoch + 1)
-            save_model(netD, paths, args.discriminator_name, args.n_files, epoch + 1)
+        if (epoch + 1) % snapshots_freq == 0:
+            save_checkpoint(netG, paths, generator_name, n_files, epoch + 1)
+            save_checkpoint(netD, paths, discriminator_name, n_files, epoch + 1)
 
     # save model
-    save_model(netG, paths, args.generator_name, args.n_files, epoch + 1)
-    save_model(netD, paths, args.discriminator_name, args.n_files, epoch + 1)
+    save_checkpoint(netG, paths, generator_name, n_files, epoch + 1)
+    save_checkpoint(netD, paths, discriminator_name, n_files, epoch + 1)
     writer.close()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Train DeepBeats')
-    parser.add_argument('--generator_name', type=str, default="lstm_tf")
-    parser.add_argument('--discriminator_name', type=str, default="cnn")
-    parser.add_argument('--load_checkpoint_G', type=str, default="", help="load checkpoint path for generator")
-    parser.add_argument('--load_checkpoint_D', type=str, default="", help="load checkpoint path for discriminator")
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--embed_dim', type=int, default=32)
-    parser.add_argument('--hidden_dim', type=int, default=256)
-    parser.add_argument('--temperature', type=float, default=1)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--n_epochs', type=int, default=10)
-    parser.add_argument('--n_notes', type=int, default=128)
-    parser.add_argument('--seq_len', type=int, default=64)
-    parser.add_argument('--n_files', type=int, default=-1,
-                        help='number of midi files to use for training')
-    parser.add_argument('--snapshots_freq', type=int, default=10)
-    parser.add_argument('--max_files_to_parse', type=int, default=-1, help='max number of midi files to parse')
+    parser = argparse.ArgumentParser('Train DeepBeats GAN')
+    parser.add_argument('-gm', '--generator_name', type=str, default = "lstm")
+    parser.add_argument('-dm', '--discriminator_name', type=str, default = "cnn")
+    parser.add_argument('-nf', '--n_files', type=int, default=-1)
+    parser.add_argument('-n', '--n_epochs', type=int, default=100)
+    parser.add_argument('-d', '--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('-s', '--snapshots_freq', type=int, default=50)
+    parser.add_argument('-gc', '--generator_checkpoint', type=str, default=None)
+    parser.add_argument('-dc', '--discriminator_checkpoint', type=str, default=None)
 
     main_args = parser.parse_args()
-    train(main_args)
+    train(**vars(main_args))

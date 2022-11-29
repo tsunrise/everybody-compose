@@ -55,6 +55,10 @@ embed_dim = 32
 hidden_dim = 256
 clip_grad = 5.0
 
+[model.cnn]
+lr = 1e-3
+embed_dim = 32
+
 [sampling.default]
 strategy = "greedy"
 init_note = 65

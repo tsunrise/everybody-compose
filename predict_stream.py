@@ -20,7 +20,7 @@ def predict_notes_sequence(beats, model, init_note, device, temperature):
     init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
     with torch.no_grad():
         notes_seq = model.sample(beats, init_note_t, temperature)
-    return notes_seq
+    return notes_seq.astype(int)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
