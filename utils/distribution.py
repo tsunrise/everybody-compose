@@ -65,9 +65,11 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         self.device = device
         self.x = x
         self.context, self.encoder_state = self.model.encoder(x)
+        self.starter = [60, 62, 64] # TODO: apply the same trick to all cases
 
     def initial_state(self) -> dict:
         super().initial_state()
+        
         return {
             "position": 0,
             "memory": (self.encoder_state[0].reshape(1, 1, -1), self.encoder_state[1].reshape(1, 1, -1)),
@@ -78,11 +80,17 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         position = state["position"]
         memory = state["memory"]
         context_curr = self.context[position].reshape(1, 1, -1)
+        if position < len(self.starter):
+            y_prev = self.starter[position]
         y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
         scores, memory = self.model.decoder.forward(y_prev, context_curr, memory)
-        scores = scores.squeeze(0)
-        scores = torch.nn.functional.softmax(scores, dim=1)
-        scores = scores.squeeze(0)
+        if position < len(self.starter):
+            scores = torch.zeros(128)
+            scores[self.starter[position]] = 1
+        else:
+            scores = scores.squeeze(0)
+            scores = torch.nn.functional.softmax(scores, dim=1)
+            scores = scores.squeeze(0)
         return {"position": position + 1, "memory": memory}, scores
 
 
