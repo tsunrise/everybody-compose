@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple
 import torch
 from models.lstm import DeepBeatsLSTM
+from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
 from models.transformer import DeepBeatsTransformer
 
 class DistributionGenerator(ABC):
@@ -55,6 +56,36 @@ class LSTMDistribution(DistributionGenerator):
         scores = scores.squeeze(0)
         return {"position": position + 1, "hidden": hidden}, scores
 
+class LocalAttnLSTMDistribution(DistributionGenerator):
+    def __init__(self, model: DeepBeatsLSTMLocalAttn, x, device):
+        """
+        - `x` is the input sequence, shape: (seq_len, 2)
+        """
+        self.model = model
+        self.device = device
+        self.x = x
+        self.context, self.encoder_state = self.model.encoder(x)
+
+    def initial_state(self) -> dict:
+        super().initial_state()
+        return {
+            "position": 0,
+            "memory": self.encoder_state
+        }
+
+    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note, sampled_sequence)
+        position = state["position"]
+        memory = state["memory"]
+        context_curr = self.context[position].reshape(1, 1, -1)
+        y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
+        scores, memory = self.model.decoder.forward(y_prev, context_curr, memory)
+        scores = scores.squeeze(0)
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
+        return {"position": position + 1, "memory": memory}, scores
+
+
 class TransformerDistribution(DistributionGenerator):
 
     def __init__(self, model: DeepBeatsTransformer, x, device):
@@ -72,7 +103,6 @@ class TransformerDistribution(DistributionGenerator):
         }
     
     def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
-        # TODO: Tom's Note: I have not tested this function yet! Feel free to correct this if something is wrong.
         super().proceed(state, prev_note, sampled_sequence)
         ys = state["ys"]
         tgt_mask = (self.model.generate_square_subsequent_mask(ys.size(0))
