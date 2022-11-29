@@ -50,19 +50,20 @@ class LocalAttnDecoder(nn.Module):
         - `tgt`: target sequence, shape: (seq_len, 1)
            tgt[i] is the (i-1)-th note in the sequence
         - `context`: context vector, shape: (seq_len, context_dim)
-        - `memory`: encoder state or intermediate state, shape: (1, hidden_dim)
+        - `memory`: encoder state or intermediate state, shape: pair of (1, hidden_dim)
         Returns:
         - `output`: output sequence, shape: (seq_len, num_notes)
                     output[i] is the probability distribution of notes at time step i
         """
+        # print(f"{tgt.shape=}, {context.shape=}, {memory[0].shape=}")
         tgt = self.note_embed(tgt)
         tgt = torch.cat((tgt, context), dim=2)
         tgt = self.combine_fc(tgt)
         tgt = F.relu(tgt)
         tgt = self.dropout(tgt)
-        tgt, _ = self.rnn(tgt, memory)
+        tgt, memory = self.rnn(tgt, memory)
         tgt = self.notes_output(tgt)
-        return tgt
+        return tgt, memory
     
 class DeepBeatsLSTMLocalAttn(nn.Module):
     """
@@ -93,7 +94,7 @@ class DeepBeatsLSTMLocalAttn(nn.Module):
                     output[i] is the probability distribution of notes at time step i
         """
         context, encoder_state = self.encoder(x)
-        output = self.decoder(tgt, context, encoder_state)
+        output, _ = self.decoder(tgt, context, encoder_state)
         return output
 
     def loss_function(self, pred, target):

@@ -70,7 +70,7 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         super().initial_state()
         return {
             "position": 0,
-            "memory": self.encoder_state
+            "memory": (self.encoder_state[0].reshape(1, 1, -1), self.encoder_state[1].reshape(1, 1, -1)),
         }
 
     def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
