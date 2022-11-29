@@ -33,11 +33,8 @@ lr = 1e-3
 seq_len = 64
 batch_size = 64
 n_notes = 128
-# embed_dim = 32
-# duration_fc_dim = 128
 hidden_dim = 256
-dropout_p = 0.1
-# context_dim = 256
+dropout_p = 0.3
 clip_grad = 5.0
 
 [model.vanilla_rnn]

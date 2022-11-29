@@ -56,11 +56,11 @@ class LocalAttnDecoder(nn.Module):
                     output[i] is the probability distribution of notes at time step i
         """
         tgt = self.note_embed(tgt)
-        tgt = self.dropout(tgt)
         tgt = torch.cat((tgt, context), dim=2)
         tgt = self.combine_fc(tgt)
         tgt = F.relu(tgt)
-        # print(f"{encoder_state[0].shape=}")
+        tgt = self.dropout(tgt)
+
         tgt, _ = self.rnn(tgt, encoder_state)
         tgt = self.notes_output(tgt)
         return tgt
