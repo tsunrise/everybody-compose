@@ -3,6 +3,7 @@ from typing import Tuple
 import torch
 from models.lstm import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
+from models.attention_rnn import DeepBeatsAttentionRNN
 
 class DistributionGenerator(ABC):
     @abstractmethod
@@ -54,6 +55,36 @@ class LSTMDistribution(DistributionGenerator):
         scores = torch.nn.functional.softmax(scores, dim=1)
         scores = scores.squeeze(0)
         return {"position": position + 1, "hidden": hidden}, scores
+
+class AttentionRNNDistribution(DistributionGenerator):
+    def __init__(self, model: DeepBeatsAttentionRNN, x, device):
+        """
+        - `x` is the input sequence, shape: (seq_len, 2)
+        """
+        self.model = model
+        self.device = device
+        self.x = x
+        self.encoder_output, _ = self.model.encoder(x)
+        self.encoder_output = self.encoder_output.unsqueeze(0)
+
+    def initial_state(self) -> dict:
+        super().initial_state()
+
+        return {
+            "position": 0,
+            "memory": None,
+        }
+
+    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note, sampled_sequence)
+        position = state["position"]
+        memory = state["memory"]
+        y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
+        scores, memory = self.model.decoder.forward(y_prev, self.encoder_output, memory)
+        scores = scores.squeeze(0)
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
+        return {"position": position + 1, "memory": memory}, scores
 
 class TransformerDistribution(DistributionGenerator):
 

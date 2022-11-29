@@ -43,7 +43,8 @@ seq_len = 64
 batch_size = 64
 n_notes = 128
 embed_dim = 32
-hidden_dim = 256
+encode_hidden_dim = 32
+decode_hidden_dim = 256
 clip_grad = 5.0
 
 [model.bi_lstm]

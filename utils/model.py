@@ -18,7 +18,7 @@ def get_model(name, config, device):
     elif name == "vanilla_rnn":
         return vanilla_rnn.DeepBeatsVanillaRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "attention_rnn":
-        return attention_rnn.DeepBeatsAttentionRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
+        return attention_rnn.DeepBeatsAttentionRNN(config["n_notes"], config["embed_dim"], config["encode_hidden_dim"], config["decode_hidden_dim"]).to(device)
     elif name == "bi_lstm":
         return bi_lstm.DeepBeatsBiLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "transformer":
@@ -42,6 +42,8 @@ def model_forward(model_name, model, input_seq: torch.Tensor, target_seq: torch.
         src_mask, tgt_mask = src_mask.to(device), tgt_mask.to(device)
         src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
         output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+    elif model_name == "attention_rnn":
+        output = model(input_seq, target_prev_seq)
     else:
         output, _ = model(input_seq, target_prev_seq)
     return output

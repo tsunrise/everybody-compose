@@ -1,108 +1,92 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.nn import functional as F
 
-
-class DeepBeatsAttentionRNN(nn.Module):
-    def __init__(self, num_notes, embed_dim, hidden_dim):
-        super(DeepBeatsAttentionRNN, self).__init__()
-        self.num_notes = num_notes
-        self.embed_dim = embed_dim
+class RNNEncoder(nn.Module):
+    def __init__(self, hidden_dim):
+        super(RNNEncoder, self).__init__()
         self.hidden_dim = hidden_dim
 
-        self.encode_lstm = nn.LSTM(2, embed_dim, batch_first=True, bidirectional = True)
+        self.fc = nn.Linear(2, hidden_dim)
+        self.encoder_lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, bidirectional = True)
 
-        self.note_embedding = nn.Embedding(num_notes, embed_dim)
-        self.attn1 = nn.Linear(embed_dim * 2 + hidden_dim, embed_dim)
+    def forward(self, x):
+        x = self.fc(x)
+        encode_output, encode_hidden_dim = self.encoder_lstm(x)
+        return encode_output, encode_hidden_dim
+
+class Attention(nn.Module):
+    def __init__(self, encode_hidden_dim, decode_hidden_dim):
+        super(Attention, self).__init__()
+        self.encode_hidden_dim = encode_hidden_dim
+        self.decode_hidden_dim = decode_hidden_dim
+
+        self.attn1 = nn.Linear(encode_hidden_dim * 2 + decode_hidden_dim, encode_hidden_dim)
         self.attn1_activation = nn.LeakyReLU()
-        self.attn2 = nn.Linear(embed_dim, 1)
-        self.attn2_activation = nn.Softmax(dim = 2)
+        self.attn2 = nn.Linear(encode_hidden_dim, 1)
+        self.attn2_activation = nn.Softmax(dim=2)
 
-        self.concat_fc = nn.Linear(embed_dim * 3, embed_dim * 3)
-        self.concat_activation = nn.LeakyReLU()
-        self.decode_lstm = nn.LSTM(embed_dim * 3, hidden_dim, batch_first=True)
-        self.notes_output = nn.Linear(hidden_dim, num_notes)
-
-        self._initializer_weights()
-
-    def _default_init_hidden(self, batch_size):
-        device = next(self.parameters()).device
-        h1_0 = torch.zeros(2, batch_size, self.encode_lstm.hidden_size).to(device)
-        c1_0 = torch.zeros(2, batch_size, self.encode_lstm.hidden_size).to(device)
-        h2_0 = torch.zeros(1, batch_size, self.decode_lstm.hidden_size).to(device)
-        c2_0 = torch.zeros(1, batch_size, self.decode_lstm.hidden_size).to(device)
-        return h1_0, c1_0, h2_0, c2_0
-
-    def _initializer_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x, y_prev, init_hidden = None):
-        """
-        x: input, shape: (batch_size, seq_len, 2)
-        y_prev: label, shape: (batch_size, seq_len), range from 0 to num_notes-1
-           y_prev[i] should be the note label for x[i-1], and y[0] is 0.
-        """
-        batch_size, seq_len, _ = x.shape
-        h1_0, c1_0, h2, c2 = self._default_init_hidden(batch_size) if init_hidden is None else init_hidden
-        predicted_notes = torch.zeros(batch_size, seq_len, self.num_notes).to(next(self.parameters()).device)
-        encode_output, encode_hidden = self.encode_lstm(x, (h1_0, c1_0))
-        for t in range(seq_len):
-            output, (h2, c2) = self.decode(encode_output, y_prev[:,t:t+1], (h2, c2))
-            predicted_notes[:, t:t+1, :] = output
-        return predicted_notes, (h2, c2)
-
-    def compute_attention(self, encode_output, hidden):
-        # encode_output shape: (batch_size, seq_len, 2 * embed_dim)
-        # hidden: (1, batch_size, hidden_dim)
+    def forward(self, encode_output, hidden_state):
         batch_size, seq_len, _ = encode_output.shape
-        hidden = hidden.permute(1, 0, 2)
-        hidden = hidden.repeat(1, seq_len, 1) # shape (batch_size, seq_len, hidden_dim)
-        concat = torch.concat((hidden, encode_output), dim = -1) # shape (batch_size, seq_len, hidden_dim + 2*embed_dim)
+        hidden_state = hidden_state.permute(1, 0, 2)
+        hidden_state = hidden_state.repeat(1, seq_len, 1)
+        concat = torch.concat((hidden_state, encode_output), dim=-1)
         attn = self.attn1(concat)
         attn = self.attn1_activation(attn)
         attn = self.attn2(attn)
-        attn = self.attn2_activation(attn) # shape (batch_size, seq_len, 1)
+        attn = self.attn2_activation(attn)
         attn = attn.view(batch_size, 1, seq_len)
-        context = torch.bmm(attn, encode_output) # shape (batch_size, 1, 2 * embed_dim)
+        context = torch.bmm(attn, encode_output)
         return context
 
-    def decode(self, encode_output, y_prev, hidden):
-        h, c = hidden
-        context = self.compute_attention(encode_output, h)
-        y_prev_embed = self.note_embedding(y_prev)
-        X = torch.concat((context, y_prev_embed), dim = -1)
-        X_fc = self.concat_fc(X)
-        X_fc = self.concat_activation(X_fc)
-        X = X_fc + X
-        X, (h, c) = self.decode_lstm(X, (h, c))
-        predicted_notes = self.notes_output(X)
-        return predicted_notes, (h, c)
+class RNNDecoder(nn.Module):
+    def __init__(self, num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p = 0.1):
+        super(RNNDecoder, self).__init__()
+        self.decode_hidden_dim = decode_hidden_dim
 
-    def sample(self, x, y_init=0, temperature=1.0):
-        seq_len, _ = x.shape
-        x = x.unsqueeze(0)
-        h1_0, c1_0, h2, c2 = self._default_init_hidden(1)
-        encode_output, encode_hidden = self.encode_lstm(x, (h1_0, c1_0))
-        ys = [y_init]
+        self.attention = Attention(encode_hidden_dim, decode_hidden_dim)
+        self.note_embedding = nn.Embedding(num_notes, embed_dim)
+        self.combine_fc = nn.Linear(encode_hidden_dim * 2 + embed_dim, decode_hidden_dim)
+        self.dropout = nn.Dropout(dropout_p)
+        self.post_attention_lstm = nn.LSTM(decode_hidden_dim, decode_hidden_dim, batch_first=True)
+        self.notes_output = nn.Linear(decode_hidden_dim, num_notes)
+
+    def forward(self, tgt, encode_output, memory=None):
+        memory = self._default_init_hidden(tgt.shape[0]) if memory is None else memory
+        context = self.attention(encode_output, memory[0])
+        tgt = self.note_embedding(tgt)
+        tgt = torch.cat((tgt, context), dim=2)
+        tgt = self.combine_fc(tgt)
+        tgt = F.relu(tgt)
+        tgt = self.dropout(tgt)
+        tgt, memory = self.post_attention_lstm(tgt, memory)
+        tgt = self.notes_output(tgt)
+        return tgt, memory
+
+    def _default_init_hidden(self, batch_size):
+        device = next(self.parameters()).device
+        h = torch.zeros(1, batch_size, self.decode_hidden_dim).to(device)
+        c = torch.zeros(1, batch_size, self.decode_hidden_dim).to(device)
+        return (h, c)
+
+class DeepBeatsAttentionRNN(nn.Module):
+    def __init__(self, num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p = 0.1):
+        super(DeepBeatsAttentionRNN, self).__init__()
+        self.num_notes = num_notes
+
+        self.encoder = RNNEncoder(encode_hidden_dim)
+        self.decoder = RNNDecoder(num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p)
+
+    def forward(self, x, tgt):
+        batch_size, seq_len, _ = x.shape
+        predicted_notes = torch.zeros(batch_size, seq_len, self.num_notes).to(next(self.parameters()).device)
+        encode_output, encode_hidden = self.encoder(x)
+        memory = None
         for t in range(seq_len):
-            y_prev = ys[-1].reshape(1,1)
-            scores, (h2, c2) = self.decode(encode_output, y_prev, (h2, c2))
-            scores = scores.squeeze(0)
-            scores = scores / temperature
-            scores = torch.nn.functional.softmax(scores, dim=1)
-            y_next = None
-            while y_next is None or y_next == ys[-1]:
-                top10 = torch.topk(scores, 3, dim=1)
-                indices, probs = top10.indices, top10.values
-                probs = probs / torch.sum(probs)
-                probs_idx = torch.multinomial(probs, 1)
-                y_next = indices[0, probs_idx]
-            ys.append(y_next)
-        out = [y.item() for y in ys[1:]]
-        return np.array(out)
+            output, memory = self.decoder(tgt[:, t:t + 1], encode_output, memory)
+            predicted_notes[:, t:t+1, :] = output
+        return predicted_notes
 
     def loss_function(self, pred, target):
         criterion = nn.CrossEntropyLoss()
