@@ -154,4 +154,5 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
         if (epoch + 1) % snapshots_freq == 0:
             save_checkpoint(model, paths, model_name, n_files, epoch + 1)
     writer.close()
+    save_checkpoint(model, paths, model_name, n_files, n_epochs)
     return model
