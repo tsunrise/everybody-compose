@@ -10,6 +10,7 @@ import warnings
 import pickle
 from tqdm import tqdm
 import csv
+from utils.constants import NOTE_START
 from utils.data_paths import DataPaths
 from dataclasses import dataclass
 
@@ -26,7 +27,7 @@ def _processed_name(dataset: str, dataset_type:str):
     return f"processed_{dataset}_{dataset_type}_v2.pkl"
 
 class BeatsRhythmsDataset(Dataset):
-    def __init__(self, seq_len, seed = 12345, initial_note: int = 60):
+    def __init__(self, seq_len, seed = 12345):
         self.seq_len = seq_len
         self.beats_list = []
         self.notes_list = []
@@ -34,7 +35,6 @@ class BeatsRhythmsDataset(Dataset):
         self.name_to_idx = {}
         self.rng = np.random.default_rng(seed)
         self.seed = seed
-        self.initial_note = initial_note
         self.dataset = ""
         self.dataset_type = ""
 
@@ -137,7 +137,7 @@ class BeatsRhythmsDataset(Dataset):
         # for teacher forcing, we need to shift the notes right by one
         notes_shifted = np.roll(notes, 1)
         if lo == 0:
-            notes_shifted[0] = self.initial_note
+            notes_shifted[0] = NOTE_START
         else:
             notes_shifted[0] = self.notes_list[idx][lo - 1]
         return {
@@ -171,7 +171,7 @@ class BeatsRhythmsDataset(Dataset):
         self.name_to_idx = state_dict["name_to_idx"]
 
     def gather(self, indices):
-        dataset = BeatsRhythmsDataset(self.seq_len, self.seed, self.initial_note)
+        dataset = BeatsRhythmsDataset(self.seq_len, self.seed)
         dataset.beats_list = [self.beats_list[i] for i in indices]
         dataset.notes_list = [self.notes_list[i] for i in indices]
         dataset.metadata_list = [self.metadata_list[i] for i in indices]

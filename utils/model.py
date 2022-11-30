@@ -80,7 +80,7 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     model = get_model(model_name, model_config, device)
     print(model)
 
-    dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
+    dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"])
     dataset.load(global_config["dataset"])
     dataset = dataset.subset_remove_short()
     if n_files > 0:
@@ -154,4 +154,5 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
         if (epoch + 1) % snapshots_freq == 0:
             save_checkpoint(model, paths, model_name, n_files, epoch + 1)
     writer.close()
+    save_checkpoint(model, paths, model_name, n_files, n_epochs)
     return model
