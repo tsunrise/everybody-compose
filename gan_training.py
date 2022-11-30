@@ -26,10 +26,10 @@ def train(generator_name: str, discriminator_name: str, n_epochs: int, device: s
     # initialize model
     config = toml.load(CONFIG_PATH)
     global_config = config["global"]
-    netG_config = config[generator_name]
+    netG_config = config["model"][generator_name]
     netG = get_model(generator_name, netG_config, device)
     print(netG)
-    netD_config = config[discriminator_name]
+    netD_config = config["model"][discriminator_name]
     netD = CNNDiscriminator(netG_config["n_notes"], netG_config["seq_len"], netD_config["embed_dim"]).to(device)
     print(netD)
 
@@ -48,7 +48,7 @@ def train(generator_name: str, discriminator_name: str, n_epochs: int, device: s
     optimizerG = torch.optim.Adam(netG.parameters(), lr=netD_config["lr"])
 
     # prepare training/validation loader
-    dataset = BeatsRhythmsDataset(netG_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
+    dataset = BeatsRhythmsDataset(netG_config["seq_len"], global_config["random_slice_seed"])
     dataset.load(global_config["dataset"])
     dataset = dataset.subset_remove_short()
     if n_files > 0:
@@ -94,8 +94,6 @@ def train(generator_name: str, discriminator_name: str, n_epochs: int, device: s
             # Generate fake image batch with G
             fake_logits = model_forward(generator_name, netG, input_seq, target_seq, target_prev_seq, device)
             fake = F.gumbel_softmax(fake_logits)
-            if generator_name == "transformer":
-                fake = fake.transpose(0,1)
             label.fill_(fake_label)
             # Classify all fake batch with D
             output = netD(input_seq, fake.detach())
