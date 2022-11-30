@@ -58,38 +58,6 @@ class DeepBeatsLSTM(nn.Module):
         X, (h2, c2) = self.layer2(X, (h2_0, c2_0))
         predicted_notes = self.notes_logits_output(X)
         return predicted_notes, (h1, c1, h2, c2)
-
-    def sample(self, x, y_init, temperature=1.0):
-        """
-        x: input, shape: (seq_len, 2)
-        y_init: initial label, shape: (1), range from 0 to num_notes-1
-
-        This function uses a for loop to generate the sequence using LSTMCell, one by one.
-        """
-        assert self.training == False, "This function should be used in eval mode."
-        assert len(x.shape) == 2, "x should be 2D tensor"
-        ys = [y_init]
-        hidden = self._default_init_hidden(1)
-        for i in range(x.shape[0]):
-            x_curr = x[i].reshape(1, 1, 2)
-            y_prev = ys[-1].reshape(1, 1)
-            scores, hidden = self.forward(x_curr,y_prev, hidden)
-            scores = scores.squeeze(0)
-            scores = scores / temperature
-            scores = torch.nn.functional.softmax(scores, dim=1)
-
-            y_next = None
-            while y_next is None:
-                top10 = torch.topk(scores, 3, dim=1)
-                indices, probs = top10.indices, top10.values
-                probs = probs / torch.sum(probs)
-                probs_idx = torch.multinomial(probs, 1)
-                y_next = indices[0, probs_idx]
-            # print(y_next)
-            ys.append(y_next)
-        out = [y.item() for y in ys[1:]]
-        print(out)
-        return np.array(out)
         
     def loss_function(self, pred, target):
         """
@@ -97,8 +65,9 @@ class DeepBeatsLSTM(nn.Module):
         Target: (batch_size, seq_len), range from 0 to num_notes-1
         """
         criterion = nn.CrossEntropyLoss()
-        target_one_hot = torch.nn.functional.one_hot(target, self.num_notes).float()
-        loss = criterion(pred, target_one_hot)
+        target = target.flatten() # (batch_size * seq_len)
+        pred = pred.reshape(-1, pred.shape[-1]) # (batch_size * seq_len, num_notes)
+        loss = criterion(pred, target)
         return loss
     
     def clip_gradients_(self, max_value):

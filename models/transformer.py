@@ -99,46 +99,13 @@ class DeepBeatsTransformer(nn.Transformer):
         """
         target = target.transpose(1, 0)
         criterion = nn.CrossEntropyLoss()
-        target_one_hot = torch.nn.functional.one_hot(target, self.num_notes).float()
-        loss = criterion(pred, target_one_hot)
+        target = target.flatten() # (batch_size * seq_len)
+        pred = pred.reshape(-1, pred.shape[-1]) # (batch_size * seq_len, num_notes)
+        loss = criterion(pred, target)
         return loss
 
     def clip_gradients_(self, max_value):
         torch.nn.utils.clip_grad.clip_grad_value_(self.parameters(), max_value)
-
-    def sample(self, src, init_note, temperature=1.0):
-        src = src.unsqueeze(1) # seq_len * 1 * 2
-        src_seq_len = src.shape[0]
-        src_mask = (torch.zeros(src_seq_len, src_seq_len)).type(torch.bool)
-        src = src.to(self.device)
-        src_mask = src_mask.to(self.device)
-
-        memory = self.encode(src, src_mask)
-        ys = torch.ones(1, 1).fill_(init_note).type(torch.long).to(self.device)
-        for _ in range(src_seq_len): # output should be the same length with input
-            memory = memory.to(self.device)
-            tgt_mask = (self.generate_square_subsequent_mask(ys.size(0))
-                        .type(torch.bool)).to(self.device)
-            out = self.decode(ys, memory, tgt_mask)
-            out = out.transpose(0, 1)
-            scores = self.generator(out[:, -1]) # 1 * num_notes
-            scores = scores / temperature
-            scores = torch.nn.functional.softmax(scores, dim=1)
-            
-            y_next = None
-            while y_next is None or y_next == ys[-1]:
-                top10 = torch.topk(scores, 3, dim=1)
-                indices, probs = top10.indices, top10.values
-                probs = probs / torch.sum(probs)
-                probs_idx = torch.multinomial(probs, 1)
-                y_next = indices[0, probs_idx]
-                y_next = y_next.item()
-
-            ys = torch.cat([ys,
-                            torch.ones(1, 1).type_as(src.data).fill_(y_next)], dim=0)
-        ys = ys.cpu().squeeze(1).numpy()
-        print(ys)
-        return ys
 
     def create_mask(self, src, tgt):
         src_seq_len = src.shape[0]

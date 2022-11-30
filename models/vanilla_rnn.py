@@ -67,8 +67,9 @@ class DeepBeatsVanillaRNN(nn.Module):
 
     def loss_function(self, pred, target):
         criterion = nn.CrossEntropyLoss()
-        target_one_hot = torch.nn.functional.one_hot(target, self.num_notes).float()
-        loss = criterion(pred, target_one_hot)
+        target = target.flatten() # (batch_size * seq_len)
+        pred = pred.reshape(-1, pred.shape[-1]) # (batch_size * seq_len, num_notes)
+        loss = criterion(pred, target)
         return loss
 
     def clip_gradients_(self, max_value):

@@ -1,4 +1,3 @@
-# render to music21 stream
 from note_seq.protobuf.music_pb2 import NoteSequence
 import note_seq.midi_io as midi_io
 import numpy as np

@@ -9,12 +9,16 @@ import datetime
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from utils.data_paths import DataPaths
-
+import models.lstm_local_attn as lstm_local_attn
+from utils.metrics import Metrics
 CONFIG_PATH = "./config.toml"
 
 def get_model(name, config, device):
     if name == "lstm":
         return lstm.DeepBeatsLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
+    elif name == "lstm_attn":
+        return lstm_local_attn.DeepBeatsLSTMLocalAttn(num_notes=config["n_notes"], hidden_dim=config["hidden_dim"],
+         dropout_p=config["dropout_p"]).to(device)
     elif name == "vanilla_rnn":
         return vanilla_rnn.DeepBeatsVanillaRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "attention_rnn":
@@ -42,7 +46,7 @@ def model_forward(model_name, model, input_seq: torch.Tensor, target_seq: torch.
         src_mask, tgt_mask = src_mask.to(device), tgt_mask.to(device)
         src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
         output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
-    elif model_name == "attention_rnn":
+    elif model_name == "attention_rnn" or model_name == "lstm_attn":
         output = model(input_seq, target_prev_seq)
     else:
         output, _ = model(input_seq, target_prev_seq)
@@ -77,7 +81,7 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     model = get_model(model_name, model_config, device)
     print(model)
 
-    dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"], global_config["initial_note"])
+    dataset = BeatsRhythmsDataset(model_config["seq_len"], global_config["random_slice_seed"])
     dataset.load(global_config["dataset"])
     dataset = dataset.subset_remove_short()
     if n_files > 0:
@@ -104,11 +108,10 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     writer = SummaryWriter(log_dir = log_dir, flush_secs= 60)
     
     best_val_loss = float("inf")
+    metrics_train = Metrics("train")
+    metrics_val = Metrics("validation")
 
     for epoch in range(epochs_start, n_epochs):
-        train_batch_loss = 0
-        val_batch_loss = 0
-
         model.train()
         for batch in train_loader:
             optimizer.zero_grad()
@@ -117,11 +120,11 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
             target_prev_seq = batch["notes_shifted"].long().to(device)
             output = model_forward(model_name, model, input_seq, target_seq, target_prev_seq, device)
             loss = model.loss_function(output, target_seq)
-            train_batch_loss += loss.item()
             loss.backward()
             if "clip_grad" in model_config:
                 model.clip_gradients_(model_config["clip_grad"])  # type: ignore
             optimizer.step()
+            metrics_train.update(len(batch), loss.item(), output, target_seq)
         
         model.eval()
         for batch in val_loader:
@@ -130,20 +133,18 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
             target_prev_seq = batch["notes_shifted"].long().to(device)
             with torch.no_grad():
                 output = model_forward(model_name, model, input_seq, target_seq, target_prev_seq, device)
-            loss = model.loss_function(output, target_seq)
-            val_batch_loss += loss.item()
+                loss = model.loss_function(output, target_seq)
+            metrics_val.update(len(batch), loss.item(), output, target_seq)
 
-        avg_train_loss = train_batch_loss / len(train_loader)
-        avg_val_loss = val_batch_loss / len(val_loader)
+        training_metrics = metrics_train.flush_and_reset(writer, epoch)
+        validation_metrics = metrics_val.flush_and_reset(writer, epoch)
         
         print('Epoch: {}/{}.............'.format(epoch, n_epochs), end=' ')
-        print("Train Loss: {:.4f}, Val Loss: {:.4f}".format(avg_train_loss, avg_val_loss))
-        writer.add_scalar("train loss", avg_train_loss, epoch)
-        writer.add_scalar("validation loss", avg_val_loss, epoch)
+        print("Train Loss: {:.4f}, Val Loss: {:.4f}, Train Acc: {:.4f}, Val Acc: {:.4f}".format(training_metrics["loss"], validation_metrics["loss"], training_metrics["accuracy"], validation_metrics["accuracy"]))
 
         # save checkpoint with lowest validation loss
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        if validation_metrics["loss"] < best_val_loss:
+            best_val_loss = validation_metrics["loss"]
             save_checkpoint(model, paths, model_name, n_files, "best")
             print("Minimum Validation Loss of {:.4f} at epoch {}/{}".format(best_val_loss, epoch, n_epochs))
             
@@ -151,4 +152,5 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
         if (epoch + 1) % snapshots_freq == 0:
             save_checkpoint(model, paths, model_name, n_files, epoch + 1)
     writer.close()
+    save_checkpoint(model, paths, model_name, n_files, n_epochs)
     return model

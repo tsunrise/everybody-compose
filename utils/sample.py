@@ -1,11 +1,12 @@
-from typing import Tuple
+from typing import List, Tuple
 import numpy as np
 import torch
 
 from models.lstm import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
 from models.attention_rnn import DeepBeatsAttentionRNN
-from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, AttentionRNNDistribution
+from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
+from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, LocalAttnLSTMDistribution, AttentionRNNDistribution
 
 def get_distribution_generator(model, beats, device) -> DistributionGenerator:
     """
@@ -20,6 +21,8 @@ def get_distribution_generator(model, beats, device) -> DistributionGenerator:
         return TransformerDistribution(model, beats, device)
     elif isinstance(model, DeepBeatsAttentionRNN):
         return AttentionRNNDistribution(model, beats, device)
+    elif isinstance(model, DeepBeatsLSTMLocalAttn):
+        return LocalAttnLSTMDistribution(model, beats, device)
     else:
         raise NotImplementedError("Sampling is not implemented for this model")
 
@@ -59,7 +62,7 @@ def stochastic_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0
     conditional_likelihood = top_p_distribution[sampled_note].item()
     return top_p_idx[sampled_note].item(), conditional_likelihood
 
-def stochastic_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, top_k:int= 4, repeat_decay: float = 0.5, initial_note: int = 60, temperature=1.) -> np.ndarray:
+def stochastic_search(model, beats: np.ndarray, hint: List[int], device: str, top_p: float= 0.9, top_k:int= 4, repeat_decay: float = 0.5, temperature=1.) -> np.ndarray:
     """
     - `model`: model to use for sampling
     - `seq_len`: the length of the sequence to be sampled
@@ -68,19 +71,19 @@ def stochastic_search(model, beats: np.ndarray, device: str, top_p: float= 0.9, 
     - `top_k`: sample only the top k notes of the distribution
     - `repeat_decay`: penalty on repeating the same note. Each time the same note is repeated, the probability of repeating it is multiplied by `1 - repeat_decay`.
                       the probability of getting N repeats is upper bounded by `(1 - repeat_decay) ** N`
-    - `initial_note`: the initial note to use
+    - `initial_note`: the "sequence-start" placeholder.
     - `temperature`: temperature of the distribution. Lower temperature gives more confidence to the most probable notes, higher temperature gives a more uniform distribution.
 
     Returns:
     - `generated_sequence`: a numpy array of shape (seq_len, ), containing the generated sequence
     """
     dist = get_distribution_generator(model, beats, device)
-    state = dist.initial_state()
-    generated_sequence = []
-    prev_note = initial_note
-    for _ in range(beats.shape[0]):
+    state = dist.initial_state(hint)
+    generated_sequence = hint[:]
+    prev_note = generated_sequence[-1]
+    for _ in range(beats.shape[0] - len(hint)):
         # get the distribution
-        state, distribution = dist.proceed(state, prev_note, torch.tensor(generated_sequence, device=device))
+        state, distribution = dist.proceed(state, prev_note)
         # sample
         sampled_note, _ = stochastic_step(prev_note, distribution, top_p, top_k, repeat_decay, temperature)
         generated_sequence.append(sampled_note)

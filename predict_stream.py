@@ -4,23 +4,12 @@ import numpy as np
 import preprocess.dataset
 import torch
 import toml
+from utils.constants import NOTE_MAP
 
 from utils.data_paths import DataPaths
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
 from utils.render import render_midi
 from utils.sample import stochastic_search
-
-def predict_notes_sequence(beats, model, init_note, device, temperature):
-    """
-    Predict notes sequence given durations sequence
-    """
-    model.to(device)
-    model.eval()
-    beats = torch.from_numpy(beats).to(device)
-    init_note_t = torch.tensor(init_note, dtype=torch.long).to(device)
-    with torch.no_grad():
-        notes_seq = model.sample(beats, init_note_t, temperature)
-    return notes_seq
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
@@ -72,7 +61,12 @@ if __name__ == '__main__':
 
     # generate notes seq given durs seq
     profile = config["sampling"][profile]
-    notes = stochastic_search(model, X, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["init_note"], profile["temperature"])
+    try:
+        hint = [NOTE_MAP[h] for h in profile["hint"]]
+    except KeyError:
+        print(f"some note in {profile['hint']} not found in NOTE_MAP")
+        exit(1)
+    notes = stochastic_search(model, X, hint, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["temperature"])
     print(notes)
     # convert stream to midi
     midi_paths = paths.midi_outputs_dir / main_args.midi_filename
