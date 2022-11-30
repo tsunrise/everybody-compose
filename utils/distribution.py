@@ -120,7 +120,7 @@ class AttentionRNNDistribution(DistributionGenerator):
         super().initial_state(hint)
         state = {
             "position": 0,
-            "memory": (self.encoder_state[0].reshape(1, 1, -1), self.encoder_state[1].reshape(1, 1, -1)),
+            "memory": None,
         }
         hint_shifted = [NOTE_START] + hint[:-1]
         for i in range(len(hint)):
