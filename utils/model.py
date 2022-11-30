@@ -46,6 +46,7 @@ def model_forward(model_name, model, input_seq: torch.Tensor, target_seq: torch.
         src_mask, tgt_mask = src_mask.to(device), tgt_mask.to(device)
         src_padding_mask, tgt_padding_mask = src_padding_mask.to(device), tgt_padding_mask.to(device)
         output = model(input_seq, target_prev_seq, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+        output = output.permute(1, 0, 2) # permute back to batch first
     elif model_name == "lstm_attn":
         output = model(input_seq, target_prev_seq)
     else:

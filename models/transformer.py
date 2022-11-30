@@ -48,7 +48,7 @@ class DeepBeatsTransformer(nn.Transformer):
                  src_vocab_size: int,
                  tgt_vocab_size: int,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.0):
+                 dropout: float = 0.1):
         super(DeepBeatsTransformer, self).__init__()
         self.transformer = Transformer(d_model=emb_size,
                                        nhead=nhead,
@@ -97,7 +97,6 @@ class DeepBeatsTransformer(nn.Transformer):
         Pred: (batch_size, seq_len, num_notes), logits
         Target: (batch_size, seq_len), range from 0 to num_notes-1
         """
-        target = target.transpose(1, 0)
         criterion = nn.CrossEntropyLoss()
         target = target.flatten() # (batch_size * seq_len)
         pred = pred.reshape(-1, pred.shape[-1]) # (batch_size * seq_len, num_notes)
