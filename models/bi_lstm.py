@@ -17,5 +17,7 @@ class DeepBeatsBiLSTM(nn.Module):
 
     def loss_function(self, pred, target):
         criterion = nn.CrossEntropyLoss()
+        target = target.flatten() # (batch_size * seq_len)
+        pred = pred.reshape(-1, pred.shape[-1]) # (batch_size * seq_len, num_notes)
         loss = criterion(pred, target)
         return loss
