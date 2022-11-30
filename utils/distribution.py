@@ -115,7 +115,7 @@ class TransformerDistribution(DistributionGenerator):
     def initial_state(self, hint: List[int]) -> dict:
         super().initial_state(hint)
         hint_shifted = [NOTE_START] + hint[:-1]
-        ys = torch.tensor(hint_shifted).reshape(1, -1).to(self.device)
+        ys = torch.tensor(hint_shifted).reshape(1, -1).permute(1, 0).to(self.device)
         return {
             "ys": ys,
         }
