@@ -59,7 +59,7 @@ On Ubuntu:
 
 ```sh
 chmod +x setup_env.sh # you only need to do this once
-./setup_env.sh
+source ./setup_env.sh
 ```
 
 On Windows:
