@@ -73,6 +73,13 @@ top_p = 0.9
 top_k = 4
 repeat_decay = 0.6
 temperature = 1.5
-hints = []
+hint = []
 
+[sampling.beta]
+strategy = "greedy"
+top_p = 0.9
+top_k = 4
+repeat_decay = 0.6
+temperature = 1.5
+hint = ["1", "2", "3", "4"]
 
