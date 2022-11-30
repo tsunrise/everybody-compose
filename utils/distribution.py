@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import List, Tuple
 import torch
 from models.lstm import DeepBeatsLSTM
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
 from models.transformer import DeepBeatsTransformer
+from utils.constants import NOTE_START
 
 class DistributionGenerator(ABC):
     @abstractmethod
@@ -14,11 +15,15 @@ class DistributionGenerator(ABC):
         pass
 
     @abstractmethod
-    def initial_state(self) -> dict:
+    def initial_state(self, hint: List[int]) -> dict:
+        """
+        Get initial state of the model for sampling, given that the initial sequence is `hint`.
+        Return the state after hint.
+        """
         pass
 
     @abstractmethod
-    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
         """
         - `state`: a dictionary containing the state of the machine
         - `sampled_sequence`: a tensor of shape (seq_len, ), containing the sampled sequence
@@ -37,15 +42,19 @@ class LSTMDistribution(DistributionGenerator):
         self.device = device
         self.x = x
 
-    def initial_state(self) -> dict:
-        super().initial_state()
-        return {
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        state = {
             "position": 0,
             "hidden": self.model._default_init_hidden(1),
         }
+        hint_shifted = [NOTE_START] + hint[:-1]
+        for i in range(len(hint)):
+            state, _ = self.proceed(state, hint_shifted[i])
+        return state
 
-    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
-        super().proceed(state, prev_note, sampled_sequence)
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
         position = state["position"]
         hidden = state["hidden"]
         x_curr = self.x[position].reshape(1, 1, 2)
@@ -65,32 +74,31 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         self.device = device
         self.x = x
         self.context, self.encoder_state = self.model.encoder(x)
-        self.starter = [60, 67, 65] # TODO: apply the same trick to all cases
 
-    def initial_state(self) -> dict:
-        super().initial_state()
-        
-        return {
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        hint_shifted = [NOTE_START] + hint[:-1]
+        state = {
             "position": 0,
             "memory": (self.encoder_state[0].reshape(1, 1, -1), self.encoder_state[1].reshape(1, 1, -1)),
         }
+        for i in range(len(hint)):
+            state, _ = self.proceed(state, hint_shifted[i])
+        return state
+        
 
-    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
-        super().proceed(state, prev_note, sampled_sequence)
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
         position = state["position"]
         memory = state["memory"]
         context_curr = self.context[position].reshape(1, 1, -1)
-        if position < len(self.starter):
-            y_prev = self.starter[position]
+
         y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
         scores, memory = self.model.decoder.forward(y_prev, context_curr, memory)
-        if position < len(self.starter):
-            scores = torch.zeros(128)
-            scores[self.starter[position]] = 1
-        else:
-            scores = scores.squeeze(0)
-            scores = torch.nn.functional.softmax(scores, dim=1)
-            scores = scores.squeeze(0)
+
+        scores = scores.squeeze(0)
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
         return {"position": position + 1, "memory": memory}, scores
 
 
@@ -104,14 +112,16 @@ class TransformerDistribution(DistributionGenerator):
         self.x = x.to(device)
         self.memory = self.model.encode(self.x, self.x_mask).to(device)
     
-    def initial_state(self) -> dict:
-        super().initial_state()
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        hint_shifted = [NOTE_START] + hint[:-1]
+        ys = torch.tensor(hint_shifted).reshape(1, -1).to(self.device)
         return {
-            "ys": torch.ones(1, 1).fill_(0).type(torch.long).to(self.device)
+            "ys": ys,
         }
     
-    def proceed(self, state: dict, prev_note: int, sampled_sequence: torch.Tensor) -> Tuple[dict, torch.Tensor]:
-        super().proceed(state, prev_note, sampled_sequence)
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
         ys = state["ys"]
         tgt_mask = (self.model.generate_square_subsequent_mask(ys.size(0))
                     .type(torch.bool)).to(self.device)

@@ -3,7 +3,6 @@ dataset = "mastero"
 random_slice_seed = 123
 val_ratio = 0.1
 train_val_split_seed = 666
-initial_note = 60
 
 [model.transformer]
 lr = 1e-3 # TODO: we can use a learning rate scheduler
@@ -70,8 +69,10 @@ embed_dim = 32
 
 [sampling.default]
 strategy = "greedy"
-init_note = 65
 top_p = 0.9
 top_k = 4
 repeat_decay = 0.6
 temperature = 1.5
+hints = []
+
+
