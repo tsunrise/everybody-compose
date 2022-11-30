@@ -109,3 +109,7 @@ class DeepBeatsLSTMLocalAttn(nn.Module):
 
     def clip_gradients_(self, max_value):
         torch.nn.utils.clip_grad.clip_grad_value_(self.parameters(), max_value)
+
+    # TODO: next step
+    # loss: https://github.com/gwinndr/MusicTransformer-Pytorch/blob/master/model/loss.py
+    # get accuracy
