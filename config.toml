@@ -28,6 +28,15 @@ embed_dim = 32
 hidden_dim = 256
 clip_grad = 5.0
 
+[model.lstm_attn]
+lr = 1e-3
+seq_len = 64
+batch_size = 64
+n_notes = 128
+hidden_dim = 1024
+dropout_p = 0.5
+clip_grad = 5.0
+
 [model.vanilla_rnn]
 lr = 1e-3 
 seq_len = 64
@@ -62,7 +71,7 @@ embed_dim = 32
 [sampling.default]
 strategy = "greedy"
 init_note = 65
-top_p = 0.8
-top_k = 3
-repeat_decay = 0.8
-temperature = 1.2
+top_p = 0.9
+top_k = 4
+repeat_decay = 0.6
+temperature = 1.5

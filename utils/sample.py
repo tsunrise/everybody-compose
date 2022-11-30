@@ -4,7 +4,8 @@ import torch
 
 from models.lstm import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
-from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution
+from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
+from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, LocalAttnLSTMDistribution
 
 def get_distribution_generator(model, beats, device) -> DistributionGenerator:
     """
@@ -17,6 +18,8 @@ def get_distribution_generator(model, beats, device) -> DistributionGenerator:
         return LSTMDistribution(model, beats, device)
     elif isinstance(model, DeepBeatsTransformer):
         return TransformerDistribution(model, beats, device)
+    elif isinstance(model, DeepBeatsLSTMLocalAttn):
+        return LocalAttnLSTMDistribution(model, beats, device)
     else:
         raise NotImplementedError("Sampling is not implemented for this model")
 
