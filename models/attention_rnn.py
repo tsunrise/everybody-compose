@@ -1,81 +1,92 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from models.model_utils import ConcatPrev
+from torch.nn import functional as F
 
-
-class DeepBeatsAttentionRNN(nn.Module):
-    def __init__(self, num_notes, embed_size, hidden_dim, num_head):
-        super(DeepBeatsAttentionRNN, self).__init__()
-        self.num_notes = num_notes
-        self.embed_size = embed_size
+class RNNEncoder(nn.Module):
+    def __init__(self, hidden_dim):
+        super(RNNEncoder, self).__init__()
         self.hidden_dim = hidden_dim
 
-        self.encode_rnn = nn.RNN(2, hidden_dim, num_layers=2, batch_first=True, bidirectional = True)
-        self.attention = nn.MultiheadAttention(hidden_dim * 2, num_head, batch_first=True)
-        self.encode_fc = nn.Linear(hidden_dim * 2, embed_size)
+        self.fc = nn.Linear(2, hidden_dim)
+        self.encoder_lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, bidirectional = True)
 
-        self.note_embedding = nn.Embedding(num_notes, embed_size)
-        self.concat_prev = ConcatPrev()
-        self.concat_input_fc = nn.Linear(embed_size * 2, embed_size * 2)
-        self.concat_input_activation = nn.LeakyReLU()
-        self.decode_rnn = nn.RNN(embed_size * 2, hidden_dim, num_layers=2, batch_first=True)
-        self.notes_output = nn.Linear(hidden_dim, num_notes)
+    def forward(self, x):
+        x = self.fc(x)
+        encode_output, encode_hidden_dim = self.encoder_lstm(x)
+        return encode_output, encode_hidden_dim
 
-        self._initializer_weights()
+class Attention(nn.Module):
+    def __init__(self, encode_hidden_dim, decode_hidden_dim):
+        super(Attention, self).__init__()
+        self.encode_hidden_dim = encode_hidden_dim
+        self.decode_hidden_dim = decode_hidden_dim
 
-    def forward(self, x, y_prev):
-        a, encode_hidden = self.encode(x)
-        predicted_notes, decode_hidden = self.decode(encode_hidden, a, y_prev)
-        return predicted_notes, decode_hidden
+        self.attn1 = nn.Linear(encode_hidden_dim * 2 + decode_hidden_dim, encode_hidden_dim)
+        self.attn1_activation = nn.LeakyReLU()
+        self.attn2 = nn.Linear(encode_hidden_dim, 1)
+        self.attn2_activation = nn.Softmax(dim=2)
 
-    def encode(self, x):
-        x, encode_hidden = self.encode_rnn(x)
-        a = self.attention(query = x, key = x, value = x)[0]
-        a = self.encode_fc(a)
-        h1 = torch.sum(encode_hidden[:2], 0, keepdim = True)
-        h2 = torch.sum(encode_hidden[2:], 0, keepdim = True)
-        encode_hidden = torch.cat((h1, h2), 0)
-        return a, encode_hidden
+    def forward(self, encode_output, hidden_state):
+        batch_size, seq_len, _ = encode_output.shape
+        hidden_state = hidden_state.permute(1, 0, 2)
+        hidden_state = hidden_state.repeat(1, seq_len, 1)
+        concat = torch.concat((hidden_state, encode_output), dim=-1)
+        attn = self.attn1(concat)
+        attn = self.attn1_activation(attn)
+        attn = self.attn2(attn)
+        attn = self.attn2_activation(attn)
+        attn = attn.view(batch_size, 1, seq_len)
+        context = torch.bmm(attn, encode_output)
+        return context
 
-    def decode(self, hidden, a, y_prev):
-        y_prev_embed = self.note_embedding(y_prev)
-        X = self.concat_prev(a, y_prev_embed)
-        X_fc = self.concat_input_fc(X)
-        X_fc = self.concat_input_activation(X_fc)
-        # residual connection
-        X = X_fc + X
-        X, decode_hidden = self.decode_rnn(X, hidden)
-        predicted_notes = self.notes_output(X)
-        return predicted_notes, decode_hidden
+class RNNDecoder(nn.Module):
+    def __init__(self, num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p = 0.1):
+        super(RNNDecoder, self).__init__()
+        self.decode_hidden_dim = decode_hidden_dim
 
-    def _initializer_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.constant_(m.bias, 0)
+        self.attention = Attention(encode_hidden_dim, decode_hidden_dim)
+        self.note_embedding = nn.Embedding(num_notes, embed_dim)
+        self.combine_fc = nn.Linear(encode_hidden_dim * 2 + embed_dim, decode_hidden_dim)
+        self.dropout = nn.Dropout(dropout_p)
+        self.post_attention_lstm = nn.LSTM(decode_hidden_dim, decode_hidden_dim, batch_first=True)
+        self.notes_output = nn.Linear(decode_hidden_dim, num_notes)
 
-    def sample(self, x, y_init=0, temperature=1.0):
-        a, hidden = self.encode(x)
-        hidden = hidden.unsqueeze(1)
-        ys = [y_init]
-        for i in range(a.shape[0]):
-            a_curr = a[i].reshape(1, 1, -1)
-            y_prev = ys[-1].reshape(1, 1)
-            scores, hidden = self.decode(hidden, a_curr, y_prev)
-            scores = scores.squeeze(0)
-            scores = scores / temperature
-            scores = torch.nn.functional.softmax(scores, dim=1)
-            y_next = None
-            while y_next is None or y_next == ys[-1]:
-                top10 = torch.topk(scores, 3, dim=1)
-                indices, probs = top10.indices, top10.values
-                probs = probs / torch.sum(probs)
-                probs_idx = torch.multinomial(probs, 1)
-                y_next = indices[0, probs_idx]
-            ys.append(y_next)
-        out = [y.item() for y in ys[1:]]
-        return np.array(out)
+    def forward(self, tgt, encode_output, memory=None):
+        memory = self._default_init_hidden(tgt.shape[0]) if memory is None else memory
+        context = self.attention(encode_output, memory[0])
+        tgt = self.note_embedding(tgt)
+        tgt = torch.cat((tgt, context), dim=2)
+        tgt = self.combine_fc(tgt)
+        tgt = F.relu(tgt)
+        tgt = self.dropout(tgt)
+        tgt, memory = self.post_attention_lstm(tgt, memory)
+        tgt = self.notes_output(tgt)
+        return tgt, memory
+
+    def _default_init_hidden(self, batch_size):
+        device = next(self.parameters()).device
+        h = torch.zeros(1, batch_size, self.decode_hidden_dim).to(device)
+        c = torch.zeros(1, batch_size, self.decode_hidden_dim).to(device)
+        return (h, c)
+
+class DeepBeatsAttentionRNN(nn.Module):
+    def __init__(self, num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p = 0.1):
+        super(DeepBeatsAttentionRNN, self).__init__()
+        self.num_notes = num_notes
+
+        self.encoder = RNNEncoder(encode_hidden_dim)
+        self.decoder = RNNDecoder(num_notes, embed_dim, encode_hidden_dim, decode_hidden_dim, dropout_p)
+
+    def forward(self, x, tgt):
+        batch_size, seq_len, _ = x.shape
+        predicted_notes = torch.zeros(batch_size, seq_len, self.num_notes).to(next(self.parameters()).device)
+        encode_output, encode_hidden = self.encoder(x)
+        memory = None
+        for t in range(seq_len):
+            output, memory = self.decoder(tgt[:, t:t + 1], encode_output, memory)
+            predicted_notes[:, t:t+1, :] = output
+        return predicted_notes
 
     def loss_function(self, pred, target):
         criterion = nn.CrossEntropyLoss()

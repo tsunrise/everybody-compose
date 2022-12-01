@@ -3,8 +3,11 @@ from typing import List, Tuple
 import torch
 from models.lstm import DeepBeatsLSTM
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
+from models.attention_rnn import DeepBeatsAttentionRNN
 from models.transformer import DeepBeatsTransformer
+
 from utils.constants import NOTE_START
+
 
 class DistributionGenerator(ABC):
     @abstractmethod
@@ -32,6 +35,7 @@ class DistributionGenerator(ABC):
         - `distribution`: a tensor of shape (n_notes, ), containing the distribution of the next note
         """
         pass
+
 
 class LSTMDistribution(DistributionGenerator):
     def __init__(self, model: DeepBeatsLSTM, x, device):
@@ -65,6 +69,7 @@ class LSTMDistribution(DistributionGenerator):
         scores = scores.squeeze(0)
         return {"position": position + 1, "hidden": hidden}, scores
 
+
 class LocalAttnLSTMDistribution(DistributionGenerator):
     def __init__(self, model: DeepBeatsLSTMLocalAttn, x, device):
         """
@@ -85,7 +90,6 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         for i in range(len(hint)):
             state, _ = self.proceed(state, hint_shifted[i])
         return state
-        
 
     def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
         super().proceed(state, prev_note)
@@ -101,17 +105,49 @@ class LocalAttnLSTMDistribution(DistributionGenerator):
         scores = scores.squeeze(0)
         return {"position": position + 1, "memory": memory}, scores
 
+class AttentionRNNDistribution(DistributionGenerator):
+    def __init__(self, model: DeepBeatsAttentionRNN, x, device):
+        """
+        - `x` is the input sequence, shape: (seq_len, 2)
+        """
+        self.model = model
+        self.device = device
+        self.x = x
+        self.encoder_output, _ = self.model.encoder(x)
+        self.encoder_output = self.encoder_output.unsqueeze(0)
+
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        state = {
+            "position": 0,
+            "memory": None,
+        }
+        hint_shifted = [NOTE_START] + hint[:-1]
+        for i in range(len(hint)):
+            state, _ = self.proceed(state, hint_shifted[i])
+        return state
+
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
+        position = state["position"]
+        memory = state["memory"]
+        y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
+        scores, memory = self.model.decoder.forward(y_prev, self.encoder_output, memory)
+        scores = scores.squeeze(0)
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
+        return {"position": position + 1, "memory": memory}, scores
 
 class TransformerDistribution(DistributionGenerator):
 
     def __init__(self, model: DeepBeatsTransformer, x, device):
-        x = x.unsqueeze(1) # (seq_len, 1, 2)
+        x = x.unsqueeze(1)  # (seq_len, 1, 2)
         self.model = model.to(device)
         self.device = device
         self.x_mask = (torch.zeros(x.shape[0], x.shape[0])).type(torch.bool).to(device)
         self.x = x.to(device)
         self.memory = self.model.encode(self.x, self.x_mask).to(device)
-    
+
     def initial_state(self, hint: List[int]) -> dict:
         super().initial_state(hint)
         hint_shifted = [NOTE_START] + hint[:-1]
@@ -119,7 +155,7 @@ class TransformerDistribution(DistributionGenerator):
         return {
             "ys": ys,
         }
-    
+
     def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
         super().proceed(state, prev_note)
         ys = state["ys"]
@@ -127,7 +163,7 @@ class TransformerDistribution(DistributionGenerator):
                     .type(torch.bool)).to(self.device)
         out = self.model.decode(ys, self.memory, tgt_mask)
         out = out.transpose(0, 1)
-        scores = self.model.generator(out[:, -1]) # 1 * num_notes, we only care about the last one
+        scores = self.model.generator(out[:, -1])  # 1 * num_notes, we only care about the last one
         scores = torch.nn.functional.softmax(scores, dim=1)
         scores = scores.transpose(0, 1).squeeze(1)
         return {"ys": torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)}, scores
