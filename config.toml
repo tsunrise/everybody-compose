@@ -6,10 +6,10 @@ train_val_split_seed = 666
 
 [model.transformer]
 lr = 1e-3 # TODO: we can use a learning rate scheduler
-seq_len = 128
+seq_len = 64
 batch_size = 64
 n_notes = 128
-embed_dim = 32
+embed_dim = 128
 hidden_dim = 1024
 clip_grad = 5.0
 num_encoder_layers = 3
