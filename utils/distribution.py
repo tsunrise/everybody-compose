@@ -5,6 +5,8 @@ from models.lstm import DeepBeatsLSTM
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
 from models.attention_rnn import DeepBeatsAttentionRNN
 from models.transformer import DeepBeatsTransformer
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
 
 from utils.constants import NOTE_START
 
@@ -35,7 +37,6 @@ class DistributionGenerator(ABC):
         - `distribution`: a tensor of shape (n_notes, ), containing the distribution of the next note
         """
         pass
-
 
 class LSTMDistribution(DistributionGenerator):
     def __init__(self, model: DeepBeatsLSTM, x, device):
@@ -167,3 +168,58 @@ class TransformerDistribution(DistributionGenerator):
         scores = torch.nn.functional.softmax(scores, dim=1)
         scores = scores.transpose(0, 1).squeeze(1)
         return {"ys": torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)}, scores
+
+class VanillaRNNDistribution(DistributionGenerator):
+    def __init__(self, model: DeepBeatsVanillaRNN, x, device):
+        """
+        - `x` is the input sequence, shape: (seq_len, 2)
+        """
+        self.model = model
+        self.device = device
+        self.x = x
+
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        state = {
+            "position": 0,
+            "hidden": self.model._default_init_hidden(1),
+        }
+        hint_shifted = [NOTE_START] + hint[:-1]
+        for i in range(len(hint)):
+            state, _ = self.proceed(state, hint_shifted[i])
+        return state
+
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
+        position = state["position"]
+        hidden = state["hidden"]
+        x_curr = self.x[position].reshape(1, 1, 2)
+        y_prev = torch.tensor(prev_note).reshape(1, 1).to(self.device)
+        scores, hidden = self.model.forward(x_curr, y_prev, hidden)
+        scores = scores.squeeze(0)
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
+        return {"position": position + 1, "hidden": hidden}, scores
+
+class BiLSTMDistribution(DistributionGenerator):
+    def __init__(self, model: DeepBeatsBiLSTM, x, device):
+        """
+        - `x` is the input sequence, shape: (seq_len, 2)
+        """
+        self.model = model
+        self.device = device
+        self.x = x
+        self.output, _ = self.model.forward(x, None)
+
+    def initial_state(self, hint: List[int]) -> dict:
+        super().initial_state(hint)
+        state = {"position": 0}
+        return state
+
+    def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
+        super().proceed(state, prev_note)
+        position = state["position"]
+        scores = self.output[position: position+1]
+        scores = torch.nn.functional.softmax(scores, dim=1)
+        scores = scores.squeeze(0)
+        return {"position": position + 1}, scores

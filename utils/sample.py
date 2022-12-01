@@ -6,7 +6,10 @@ from models.lstm import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
 from models.attention_rnn import DeepBeatsAttentionRNN
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
-from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, LocalAttnLSTMDistribution, AttentionRNNDistribution
+from models.vanilla_rnn import DeepBeatsVanillaRNN
+from models.bi_lstm import DeepBeatsBiLSTM
+from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, LocalAttnLSTMDistribution, AttentionRNNDistribution, VanillaRNNDistribution, BiLSTMDistribution
+
 
 def get_distribution_generator(model, beats, device) -> DistributionGenerator:
     """
@@ -23,6 +26,10 @@ def get_distribution_generator(model, beats, device) -> DistributionGenerator:
         return AttentionRNNDistribution(model, beats, device)
     elif isinstance(model, DeepBeatsLSTMLocalAttn):
         return LocalAttnLSTMDistribution(model, beats, device)
+    elif isinstance(model, DeepBeatsVanillaRNN):
+        return VanillaRNNDistribution(model, beats, device)
+    elif isinstance(model, DeepBeatsBiLSTM):
+        return BiLSTMDistribution(model, beats, device)
     else:
         raise NotImplementedError("Sampling is not implemented for this model")
 
