@@ -140,13 +140,14 @@ class AttentionRNNDistribution(DistributionGenerator):
 
 class TransformerDistribution(DistributionGenerator):
 
-    def __init__(self, model: DeepBeatsTransformer, x, device):
+    def __init__(self, model: DeepBeatsTransformer, x, device, max_seq=64):
         x = x.unsqueeze(1)  # (seq_len, 1, 2)
         self.model = model.to(device)
         self.device = device
         self.x_mask = (torch.zeros(x.shape[0], x.shape[0])).type(torch.bool).to(device)
         self.x = x.to(device)
         self.memory = self.model.encode(self.x, self.x_mask).to(device)
+        self.max_seq = max_seq
 
     def initial_state(self, hint: List[int]) -> dict:
         super().initial_state(hint)
@@ -159,11 +160,13 @@ class TransformerDistribution(DistributionGenerator):
     def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
         super().proceed(state, prev_note)
         ys = state["ys"]
-        tgt_mask = (self.model.generate_square_subsequent_mask(ys.size(0))
+        curr_i = len(ys)
+        prev_ys = torch.cat([ys, torch.ones(self.max_seq - ys.shape[0], 1).type_as(self.x.data).fill_(0)]) # fill max_seq
+        tgt_mask = (self.model.generate_square_subsequent_mask(prev_ys.size(0))
                     .type(torch.bool)).to(self.device)
-        out = self.model.decode(ys, self.memory, tgt_mask)
-        out = out.transpose(0, 1)
-        scores = self.model.generator(out[:, -1])  # 1 * num_notes, we only care about the last one
+        out = self.model.decode(prev_ys, self.memory, tgt_mask) # max_seq * 1 * 128
+        out = out.transpose(0, 1)  # 1 * max_seq * 128
+        scores = self.model.generator(out[:, curr_i])  # 1 * num_notes, we only care about the current one
         scores = torch.nn.functional.softmax(scores, dim=1)
         scores = scores.transpose(0, 1).squeeze(1)
         return {"ys": torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)}, scores
