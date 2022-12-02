@@ -1,8 +1,10 @@
+from models.rpr import TransformerDecoderLayerRPR, TransformerDecoderRPR, TransformerEncoderLayerRPR, TransformerEncoderRPR
 from torch import Tensor
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn import Transformer
+from torch.nn.modules.normalization import LayerNorm
 import math
 
 """
@@ -59,33 +61,40 @@ class DeepBeatsTransformer(nn.Transformer):
                  src_vocab_size: int,
                  tgt_vocab_size: int,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+                 dropout: float = 0.1,
+                 max_seq: int = 64):
         super(DeepBeatsTransformer, self).__init__()
+        encoder_norm = LayerNorm(emb_size)
+        encoder_layer = TransformerEncoderLayerRPR(emb_size, nhead, dim_feedforward, dropout, max_seq)
+        encoder = TransformerEncoderRPR(encoder_layer, num_encoder_layers, encoder_norm)
+
+        decoder_norm = LayerNorm(emb_size)
+        decoder_layer = TransformerDecoderLayerRPR(emb_size, nhead, dim_feedforward, dropout, max_seq)
+        decoder = TransformerDecoderRPR(decoder_layer, num_decoder_layers, decoder_norm)
+
         self.transformer = Transformer(d_model=emb_size,
                                        nhead=nhead,
                                        num_encoder_layers=num_encoder_layers,
                                        num_decoder_layers=num_decoder_layers,
                                        dim_feedforward=dim_feedforward,
-                                       dropout=dropout)
+                                       dropout=dropout,
+                                       custom_encoder=encoder,
+                                       custom_decoder=decoder)
         self.num_notes = tgt_vocab_size
         self.emb_size = emb_size
         self.generator = nn.Linear(emb_size, tgt_vocab_size)
         self.src_tok_emb = nn.Linear(src_vocab_size, emb_size)
-        self.relu = nn.Tanh()
         self.dropout = nn.Dropout(dropout)
         self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
         self.device = 'cpu'
-        self.layer_norm = LayerNormalization(d_model=emb_size)
-        self.combine_fc = nn.Linear(emb_size * 2, emb_size)
         self._initialize()
         
     def _initialize(self):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-                # nn.init.normal_(p)
     
     def to(self, device):
         super(DeepBeatsTransformer, self).to(device)
@@ -100,37 +109,20 @@ class DeepBeatsTransformer(nn.Transformer):
                 src_padding_mask: Tensor,
                 tgt_padding_mask: Tensor,
                 memory_key_padding_mask: Tensor):
-        # src_emb = self.positional_encoding(self.relu(self.src_tok_emb(src)) * math.sqrt(self.emb_size))
-        src_emb = self.positional_encoding(self.src_tok_emb(src)) # seq_len, batch, emb_size
+        src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg))
 
-        context, memory = self.encode(src, src_mask)
-        # print("tgt_emb.shape before concat: ", tgt_emb.shape)
-        tgt_emb = torch.cat((tgt_emb, context), dim=2) # seq_len, batch, emb_size * 2
-        tgt_emb = F.relu(tgt_emb)
-        tgt_emb = self.dropout(tgt_emb)
-        # print("tgt_emb.shape after concat: ", tgt_emb.shape)
-        tgt_emb = self.combine_fc(tgt_emb)
-        # print("tgt_emb.shape after combine fc: ", tgt_emb.shape)
-        outs = self.decode(tgt_emb, memory, tgt_mask)
-        # outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
-        #                         src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
+        outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
+                                src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
         return self.generator(outs)
 
     def encode(self, src: Tensor, src_mask: Tensor):
-        # return self.transformer.encoder(self.relu(self.positional_encoding(
-        #                     self.src_tok_emb(src)) * math.sqrt(self.emb_size)), src_mask)
         src_emb = self.positional_encoding(self.src_tok_emb(src))
-        memory = self.transformer.encoder(src_emb, src_mask)
-        
-        return src_emb, memory
-
+        return self.transformer.encoder(src_emb, src_mask)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
-        # return self.transformer.decoder(self.positional_encoding(
-        #                   self.tgt_tok_emb(tgt)), memory,
-        #                   tgt_mask)
-        return self.transformer.decoder(tgt, memory, tgt_mask)
+        tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt))
+        return self.transformer.decoder(tgt_emb, memory, tgt_mask)
     
     def loss_function(self, pred, target):
         """

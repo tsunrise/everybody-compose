@@ -14,7 +14,7 @@ hidden_dim = 1024
 clip_grad = 5.0
 num_encoder_layers = 3
 num_decoder_layers = 3
-num_heads = 4
+num_heads = 8
 src_vocab_size = 2
 tgt_vocab_size = 128
 
