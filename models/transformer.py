@@ -41,16 +41,6 @@ class TokenEmbedding(nn.Module):
     def forward(self, tokens: Tensor):
         return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
 
-class LayerNormalization(nn.Module):
-    def __init__(self, eps=1e-6, d_model=128):
-        super().__init__()
-        self.eps = eps
-        self.layer = nn.LayerNorm([d_model], elementwise_affine=True, eps=self.eps)
-
-    def forward(self, x):
-        x = self.layer(x)
-        return 
-
 # Seq2Seq Network
 class DeepBeatsTransformer(nn.Transformer):
     def __init__(self,
