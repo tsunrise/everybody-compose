@@ -160,13 +160,14 @@ class TransformerDistribution(DistributionGenerator):
     def proceed(self, state: dict, prev_note: int) -> Tuple[dict, torch.Tensor]:
         super().proceed(state, prev_note)
         ys = state["ys"]
+        ys = torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)
         curr_i = ys.shape[0]
         filled_ys = torch.cat([ys, torch.ones(self.max_seq - curr_i, 1).type_as(self.x.data).fill_(0)]) # fill max_seq
         tgt_mask = (self.model.generate_square_subsequent_mask(filled_ys.shape[0])
                     .type(torch.bool)).to(self.device)
         out = self.model.decode(filled_ys, self.memory, tgt_mask) # max_seq * 1 * 128
         out = out.transpose(0, 1)  # 1 * max_seq * 128
-        scores = self.model.generator(out[:, curr_i])  # 1 * num_notes, we only care about the current one
+        scores = self.model.generator(out[:, curr_i - 1])  # 1 * num_notes, we only care about the current one
         scores = torch.nn.functional.softmax(scores, dim=1)
         scores = scores.transpose(0, 1).squeeze(1)
-        return {"ys": torch.cat([ys, torch.ones(1, 1).type_as(self.x.data).fill_(prev_note)], dim=0)}, scores
+        return {"ys": ys}, scores
