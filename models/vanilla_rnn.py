@@ -44,27 +44,6 @@ class DeepBeatsVanillaRNN(nn.Module):
         predicted_notes = self.notes_output(X)
         return predicted_notes, (h1, h2)
 
-    def sample(self, x, y_init=0, temperature=1.0):
-        ys = [y_init]
-        hidden = self._default_init_hidden(1)
-        for i in range(x.shape[0]):
-            x_curr = x[i].reshape(1, 1, 2)
-            y_prev = ys[-1].reshape(1, 1)
-            scores, hidden = self.forward(x_curr, y_prev, hidden)
-            scores = scores.squeeze(0)
-            scores = scores / temperature
-            scores = torch.nn.functional.softmax(scores, dim=1)
-            y_next = None
-            while y_next is None or y_next == ys[-1]:
-                top10 = torch.topk(scores, 3, dim=1)
-                indices, probs = top10.indices, top10.values
-                probs = probs / torch.sum(probs)
-                probs_idx = torch.multinomial(probs, 1)
-                y_next = indices[0, probs_idx]
-            ys.append(y_next)
-        out = [y.item() for y in ys[1:]]
-        return np.array(out)
-
     def loss_function(self, pred, target):
         criterion = nn.CrossEntropyLoss()
         target = target.flatten() # (batch_size * seq_len)
