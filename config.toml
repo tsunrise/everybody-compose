@@ -75,3 +75,8 @@ repeat_decay = 0.6
 temperature = 1.2
 hint = ["1", "2", "3", "4"]
 
+[sampling.beam]
+strategy = "beam"
+repeat_decay = 0.3
+hint = ["1", "2", "3", "4"]
+num_beams = 4

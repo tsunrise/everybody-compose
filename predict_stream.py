@@ -9,7 +9,7 @@ from utils.constants import NOTE_MAP
 from utils.data_paths import DataPaths
 from utils.model import CONFIG_PATH, get_model, load_checkpoint
 from utils.render import render_midi
-from utils.sample import stochastic_search
+from utils.sample import beam_search, stochastic_search
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Save Predicted Notes Sequence to Midi')
@@ -66,7 +66,12 @@ if __name__ == '__main__':
     except KeyError:
         print(f"some note in {profile['hint']} not found in NOTE_MAP")
         exit(1)
-    notes = stochastic_search(model, X, hint, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["temperature"])
+    if profile["strategy"] == "stochastic":
+        notes = stochastic_search(model, X, hint, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["temperature"])
+    elif profile["strategy"] == "beam":
+        notes = beam_search(model, X, hint, device, profile["repeat_decay"], profile["num_beams"])
+    else:
+        raise NotImplementedError(f"strategy {profile['strategy']} not implemented")
     print(notes)
     # convert stream to midi
     midi_paths = paths.midi_outputs_dir / main_args.midi_filename
