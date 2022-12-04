@@ -69,7 +69,7 @@ if __name__ == '__main__':
     if profile["strategy"] == "stochastic":
         notes = stochastic_search(model, X, hint, device, profile["top_p"], profile["top_k"], profile["repeat_decay"], profile["temperature"])
     elif profile["strategy"] == "beam":
-        notes = beam_search(model, X, hint, device, profile["repeat_decay"], profile["num_beams"])
+        notes = beam_search(model, X, hint, device, profile["repeat_decay"], profile["num_beams"], profile["beam_prob"], profile["temperature"])
     else:
         raise NotImplementedError(f"strategy {profile['strategy']} not implemented")
     print(notes)
