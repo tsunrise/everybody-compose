@@ -60,7 +60,7 @@ def stochastic_step(prev_note: int, distribution: torch.Tensor, top_p: float = 0
     # normalize the distribution
     top_p_distribution = top_p_distribution / top_p_distribution.sum()
     # apply temperature
-    top_p_distribution = top_p_distribution / temperature
+    top_p_distribution = top_p_distribution ** (1 / temperature)
     # sample
     sampled_note = int(torch.multinomial(top_p_distribution, 1).item())
     conditional_likelihood = top_p_distribution[sampled_note].item()
