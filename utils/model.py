@@ -1,7 +1,7 @@
 from typing import Optional
 import numpy as np
 import torch
-from models import lstm, bi_lstm, transformer, vanilla_rnn, attention_rnn
+from models import lstm, transformer, vanilla_rnn, attention_rnn
 import toml
 from preprocess.dataset import BeatsRhythmsDataset
 import torch.utils.data
@@ -23,8 +23,6 @@ def get_model(name, config, device):
         return vanilla_rnn.DeepBeatsVanillaRNN(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "attention_rnn":
         return attention_rnn.DeepBeatsAttentionRNN(config["n_notes"], config["embed_dim"], config["encode_hidden_dim"], config["decode_hidden_dim"]).to(device)
-    elif name == "bi_lstm":
-        return bi_lstm.DeepBeatsBiLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
     elif name == "transformer":
         return transformer.DeepBeatsTransformer(
             num_encoder_layers=config["num_encoder_layers"], 

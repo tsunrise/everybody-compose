@@ -55,15 +55,6 @@ encode_hidden_dim = 512
 decode_hidden_dim = 1024
 clip_grad = 5.0
 
-[model.bi_lstm]
-lr = 1e-3 
-seq_len = 64
-batch_size = 64
-n_notes = 128
-embed_dim = 32
-hidden_dim = 128
-clip_grad = 5.0
-
 [model.cnn]
 lr = 1e-3
 embed_dim = 32
