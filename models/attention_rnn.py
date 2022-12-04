@@ -22,10 +22,10 @@ class Attention(nn.Module):
         self.encode_hidden_dim = encode_hidden_dim
         self.decode_hidden_dim = decode_hidden_dim
 
-        self.attn1 = nn.Linear(encode_hidden_dim * 2 + decode_hidden_dim, encode_hidden_dim)
+        self.attn1 = nn.Linear(encode_hidden_dim * 2 + decode_hidden_dim, decode_hidden_dim)
         self.attn1_activation = nn.LeakyReLU()
-        self.attn2 = nn.Linear(encode_hidden_dim, 1)
-        self.attn2_activation = nn.Softmax(dim=2)
+        self.attn2 = nn.Linear(decode_hidden_dim, 1)
+        self.attn2_activation = nn.Softmax(dim=1)
 
     def forward(self, encode_output, hidden_state):
         batch_size, seq_len, _ = encode_output.shape
