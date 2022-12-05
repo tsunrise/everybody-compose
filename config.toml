@@ -60,7 +60,7 @@ lr = 1e-3
 embed_dim = 32
 
 [sampling.default]
-strategy = "greedy"
+strategy = "stochastic"
 top_p = 0.9
 top_k = 4
 repeat_decay = 0.6
@@ -68,7 +68,7 @@ temperature = 1.5
 hint = []
 
 [sampling.beta]
-strategy = "greedy"
+strategy = "stochastic"
 top_p = 0.9
 top_k = 4
 repeat_decay = 0.6
@@ -81,4 +81,4 @@ repeat_decay = 0.3
 hint = ["1", "2", "3", "4"]
 num_beams = 5
 beam_prob = 0.5
-temperature = 1.2
+temperature = 1
