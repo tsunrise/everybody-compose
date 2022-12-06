@@ -105,6 +105,7 @@ def train(model_name: str, n_epochs: int, device: str, n_files:int=-1, snapshots
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
     log_dir = paths.tensorboard_dir / "{}_{}/{}".format(model_name, "all" if n_files == -1 else n_files, current_time)
     writer = SummaryWriter(log_dir = log_dir, flush_secs= 60)
+    writer.add_text("config", toml.dumps(model_config))
     
     best_val_loss = float("inf")
     metrics_train = Metrics("train")
