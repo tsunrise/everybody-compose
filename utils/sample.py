@@ -2,7 +2,6 @@ from typing import List, Tuple
 import numpy as np
 import torch
 
-from models.lstm import DeepBeatsLSTM
 from models.transformer import DeepBeatsTransformer
 from models.attention_rnn import DeepBeatsAttentionRNN
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
@@ -17,9 +16,7 @@ def get_distribution_generator(model, beats, device) -> DistributionGenerator:
     - `device`: the device to use
     """
     beats = torch.from_numpy(beats).float().to(device)
-    if isinstance(model, DeepBeatsLSTM):
-        return LSTMDistribution(model, beats, device)
-    elif isinstance(model, DeepBeatsTransformer):
+    if isinstance(model, DeepBeatsTransformer):
         return TransformerDistribution(model, beats, device)
     elif isinstance(model, DeepBeatsAttentionRNN):
         return AttentionRNNDistribution(model, beats, device)

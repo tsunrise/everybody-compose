@@ -1,7 +1,7 @@
 from typing import Optional
 import numpy as np
 import torch
-from models import lstm, transformer, vanilla_rnn, attention_rnn
+from models import transformer, vanilla_rnn, attention_rnn
 import toml
 from preprocess.dataset import BeatsRhythmsDataset
 import torch.utils.data
@@ -14,9 +14,7 @@ from utils.metrics import Metrics
 CONFIG_PATH = "./config.toml"
 
 def get_model(name, config, device):
-    if name == "lstm":
-        return lstm.DeepBeatsLSTM(config["n_notes"], config["embed_dim"], config["hidden_dim"]).to(device)
-    elif name == "lstm_attn":
+    if name == "lstm_attn":
         return lstm_local_attn.DeepBeatsLSTMLocalAttn(num_notes=config["n_notes"], hidden_dim=config["hidden_dim"],
          dropout_p=config["dropout_p"]).to(device)
     elif name == "vanilla_rnn":
