@@ -49,7 +49,7 @@ python train.py -m lstm_attn
 python train.py -m lstm_attn -nf 10 -n 1000 -d cpu -s 100 -c ./.project_data/snapshots/my_checkpoint.pth
 
 # Train the Transformer RPR model using all available files, for 500 epochs, on the default device, saving snapshots every 50 epochs, and not using a checkpoint
-python train.py -m transformer -n 500 -s 50 ./.project_data/snapshots/my_checkpoint.pth
+python train.py -m transformer -n 500 -s 50
 ```
 
 ## Generating Melodies from Beats
@@ -70,8 +70,8 @@ To specify the device to use for generating the predicted sequence, use the `-d`
 
 To specify the source of the input beats, use the `-s` or `--source` argument followed by a string. The default value is interactive, which means that the user will be prompted to input the beats using the keyboard. Other possible values are:
 
-- A file path, e.g. `my_input_sequence.txt`, to load the starting sequence from a file.
-- `dataset` to use a random sample from the dataset as the starting sequence.
+- A file path, e.g. `beat_sequence.npy`, to load the recorded beats from a file. Recorded beats can be generated using the `create_beats.py` script.
+- `dataset` to use a random sample from the dataset as the beats.
 
 To specify the profile to use for generating the predicted sequence, use the `-t` or `--profile` argument followed by a string. The available values are `beta`, which uses stochastic search, or `beam`, which uses hybrid beam search. The heuristic parameters for these profiles can be customized in the config.toml file by adjusting the corresponding sections in `[sampling.beta]` and `[sampling.beam]`. The default value is default, which uses the settings specified in the `config.toml` file.
 
