@@ -1,4 +1,4 @@
-# CS 230 Final Project: Everybody Compose: Deep Beats To Music 
+# Everybody Compose: Deep Beats To Music 
 Authors: Tom Shen, Violet Yao, Yixin Liu
 
 This repository contains the code for our final project for CS 230: Deep Learning at Stanford University.
