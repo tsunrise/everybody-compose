@@ -45,11 +45,11 @@ Here are some examples of how to use these arguments:
 # Train the LSTM with Local Attention model using all available files, for 100 epochs, on the default device, saving snapshots every 200 epochs, and not using a checkpoint
 python train.py -m lstm_attn
 
-# Train the LSTM with Local Attention model using 10 files, for 1000 epochs, on the CPU, saving snapshots every 100 epochs, and starting from the checkpoint at my_checkpoint.pth
-python train.py -m lstm_attn -nf 10 -n 1000 -d cpu -s 100 -c my_checkpoint.pth
+# Train the LSTM with Local Attention model using 10 files, for 1000 epochs, on the CPU, saving snapshots every 100 epochs, and starting from the checkpoint
+python train.py -m lstm_attn -nf 10 -n 1000 -d cpu -s 100 -c ./project_data/snapshots/my_checkpoint.pth
 
 # Train the Transformer RPR model using all available files, for 500 epochs, on the default device, saving snapshots every 50 epochs, and not using a checkpoint
-python train.py -m transformer -n 500 -s 50
+python train.py -m transformer -n 500 -s 50 ./project_data/snapshots/my_checkpoint.pth
 ```
 
 ## Generating Melodies from Beats
@@ -68,7 +68,7 @@ The generated MIDI file will be saved using the filename specified by the `-o` o
 
 To specify the device to use for generating the predicted sequence, use the `-d` or `--device` argument followed by a string. The default value is `cuda` if a CUDA-enabled GPU is available, or `cpu` if not.
 
-To specify the source of the input sequence, use the `-s` or `--source` argument followed by a string. The default value is interactive, which means that the user will be prompted to input the starting sequence using the keyboard. Other possible values are:
+To specify the source of the input beats, use the `-s` or `--source` argument followed by a string. The default value is interactive, which means that the user will be prompted to input the beats using the keyboard. Other possible values are:
 
 - A file path, e.g. `my_input_sequence.txt`, to load the starting sequence from a file.
 - `dataset` to use a random sample from the dataset as the starting sequence.
@@ -78,12 +78,6 @@ To specify the profile to use for generating the predicted sequence, use the `-t
 Here are some examples of how to use these arguments:
 
 ```sh
-# Generate a predicted sequence using the LSTM with Local Attention model, starting from a sequence input by the user using the keyboard, using the checkpoint at my_checkpoint.pth, on the default device, and using the default profile with default settings
-python predict_stream.py -m lstm_attn -c my_checkpoint.pth
-
-# Generate a predicted sequence using the Transformer RPR model, starting from a sequence in my_input_sequence.txt, using the checkpoint at my_checkpoint.pth, on the CPU, and using the hybrid beam search profile with custom settings from the config.toml file
-python predict_stream.py -m transformer -c my_checkpoint.pth -s my_input_sequence.txt -d cpu -t beam
-
-# Generate a predicted sequence using the LSTM with Full Attention model, starting from a random sample from the dataset, using the checkpoint at my_checkpoint.pth, on the default device, and using the stochastic search profile with custom settings from the config.toml file
-python predict_stream.py -m attention_rnn -c my_checkpoint.pth -s dataset -t beta
+# Generate a predicted sequence using the LSTM with Local Attention model, from beats by the user using the keyboard, using the checkpoint at ./project_data/snapshots/my_checkpoint.pth, on the default device, and using the beta profile with default settings
+python predict_stream.py -m lstm_attn -c ./project_data/snapshots/my_checkpoint.pth -t beta
 ```
