@@ -6,7 +6,7 @@ from models.transformer import DeepBeatsTransformer
 from models.attention_rnn import DeepBeatsAttentionRNN
 from models.lstm_local_attn import DeepBeatsLSTMLocalAttn
 from models.vanilla_rnn import DeepBeatsVanillaRNN
-from utils.distribution import DistributionGenerator, LSTMDistribution, TransformerDistribution, LocalAttnLSTMDistribution, AttentionRNNDistribution, VanillaRNNDistribution
+from utils.distribution import DistributionGenerator, TransformerDistribution, LocalAttnLSTMDistribution, AttentionRNNDistribution, VanillaRNNDistribution
 from tqdm import tqdm
 
 def get_distribution_generator(model, beats, device) -> DistributionGenerator:
