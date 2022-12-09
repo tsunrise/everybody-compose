@@ -68,7 +68,7 @@ The generated MIDI file will be saved using the filename specified by the `-o` o
 
 To specify the device to use for generating the predicted sequence, use the `-d` or `--device` argument followed by a string. The default value is `cuda` if a CUDA-enabled GPU is available, or `cpu` if not.
 
-To specify the source of the input beats, use the `-s` or `--source` argument followed by a string. The default value is interactive, which means that the user will be prompted to input the beats using the keyboard. Other possible values are:
+To specify the source of the input beats, use the `-s` or `--source` argument followed by a string. The default value is `interactive`, which means that the user will be prompted to input the beats using the keyboard. Other possible values are:
 
 - A file path, e.g. `beat_sequence.npy`, to load the recorded beats from a file. Recorded beats can be generated using the `create_beats.py` script.
 - `dataset` to use a random sample from the dataset as the beats.
