@@ -46,10 +46,10 @@ Here are some examples of how to use these arguments:
 python train.py -m lstm_attn
 
 # Train the LSTM with Local Attention model using 10 files, for 1000 epochs, on the CPU, saving snapshots every 100 epochs, and starting from the checkpoint
-python train.py -m lstm_attn -nf 10 -n 1000 -d cpu -s 100 -c ./project_data/snapshots/my_checkpoint.pth
+python train.py -m lstm_attn -nf 10 -n 1000 -d cpu -s 100 -c ./.project_data/snapshots/my_checkpoint.pth
 
 # Train the Transformer RPR model using all available files, for 500 epochs, on the default device, saving snapshots every 50 epochs, and not using a checkpoint
-python train.py -m transformer -n 500 -s 50 ./project_data/snapshots/my_checkpoint.pth
+python train.py -m transformer -n 500 -s 50 ./.project_data/snapshots/my_checkpoint.pth
 ```
 
 ## Generating Melodies from Beats
@@ -78,6 +78,6 @@ To specify the profile to use for generating the predicted sequence, use the `-t
 Here are some examples of how to use these arguments:
 
 ```sh
-# Generate a predicted sequence using the LSTM with Local Attention model, from beats by the user using the keyboard, using the checkpoint at ./project_data/snapshots/my_checkpoint.pth, on the default device, and using the beta profile with default settings
-python predict_stream.py -m lstm_attn -c ./project_data/snapshots/my_checkpoint.pth -t beta
+# Generate a predicted sequence using the LSTM with Local Attention model, from beats by the user using the keyboard, using the checkpoint at ./.project_data/snapshots/my_checkpoint.pth, on the default device, and using the beta profile with default settings
+python predict_stream.py -m lstm_attn -c ./.project_data/snapshots/my_checkpoint.pth -t beta
 ```
