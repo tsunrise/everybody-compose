@@ -1,8 +1,6 @@
 # Everybody Compose: Deep Beats To Music 
 Authors: Tom Shen, Violet Yao, Yixin Liu
 
-This repository contains the code for our final project for CS 230: Deep Learning at Stanford University.
-
 ## Abstract
 
 This project presents a deep learning approach to generate monophonic melodies based on input beats, allowing even amateurs to create their own music compositions. Three effective methods - LSTM with Full Attention, LSTM with Local Attention, and Transformer with Relative Position Representation - are proposed for this novel task, providing great variation, harmony, and structure in the generated music. This project allows anyone to compose their own music by tapping their keyboards or ``recoloring'' beat sequences from existing works.
