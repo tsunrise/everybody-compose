@@ -1,5 +1,5 @@
 # Everybody Compose: Deep Beats To Music 
-Authors: Tom Shen, Violet Yao, Yixin Liu
+Authors: Conghao Shen, Violet Yao, Yixin Liu
 
 ## Abstract
 
