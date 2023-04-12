@@ -19,6 +19,8 @@ pip install --upgrade tensorboard
 ```
 This issue is due to an conflicting requirements of `note_seq` and `tensorboard`.
 
+We have also provided a [Colab Notebook](https://colab.research.google.com/drive/1oVn-lZI1K23EC9py6UibDOL7swQGp4v9?usp=sharing#scrollTo=kp6HIjuYvoye) for your reference.
+
 ## Training
 The preprocessed dataset will automatically be downloaded before training. To train a model, run the `train.py` script with the `-m` or `--model_name` argument followed by a string specifying the name of the model to use. The available model names are:
 
