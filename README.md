@@ -9,9 +9,9 @@ This project presents a deep learning approach to generate monophonic melodies b
 
 To get started, clone this repository and install the required packages:
 ```sh
-git clone https://github.com/tsunrise/cs230-proj.git
-cd cs230-proj
-pip -r requirements.txt
+git clone https://github.com/tsunrise/everybody-compose.git
+cd everybody-compose
+pip install -r requirements.txt
 ```
 You may encouter dependency issues during training on `protobuf`. If so, try reinstall `tensorboard` by running:
 ```sh
